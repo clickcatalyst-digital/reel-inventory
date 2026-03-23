@@ -67,13 +67,14 @@ router.post('/', (req, res) => {
 
 router.get('/recent', (req, res) => {
   const limit = parseInt(req.query.limit) || 50;
+  const offset = parseInt(req.query.offset) || 0;
   const reels = queryAll(`
     SELECT r.*, i.description 
     FROM reels r 
     JOIN items i ON r.item_code = i.item_code 
     ORDER BY r.inward_date DESC 
-    LIMIT ?
-  `, [limit]);
+    LIMIT ? OFFSET ?
+  `, [limit, offset]);
   res.json(reels);
 });
 

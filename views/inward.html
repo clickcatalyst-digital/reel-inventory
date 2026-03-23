@@ -94,8 +94,13 @@
           </tbody>
         </table>
       </div>
-      <div style="margin-top:12px;">
+      <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center;">
         <button class="btn btn-ghost" onclick="reprintSelected()">Reprint Selected Labels</button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn btn-ghost btn-sm" id="prevBtn" onclick="changePage(-1)" disabled>← Prev</button>
+          <span style="font-size:12px; color:var(--text-muted);" id="pageInfo">Page 1</span>
+          <button class="btn btn-ghost btn-sm" id="nextBtn" onclick="changePage(1)">Next →</button>
+        </div>
       </div>
     </div>
   </div>
@@ -232,12 +237,17 @@
       lastResult = null;
     }
 
+    let currentPage = 1;
+    const pageSize = 30;
+
     async function loadRecent() {
       try {
-        const reels = await api('/api/inward/recent?limit=30');
+        const offset = (currentPage - 1) * pageSize;
+        const reels = await api(`/api/inward/recent?limit=${pageSize}&offset=${offset}`);
         const tbody = document.getElementById('recentTable');
         if (!reels.length) {
           tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No inwards yet</td></tr>';
+          document.getElementById('nextBtn').disabled = true;
           return;
         }
         tbody.innerHTML = reels.map(r => `
@@ -251,7 +261,18 @@
             <td>${formatDateTime(r.inward_date)}</td>
           </tr>
         `).join('');
+
+        document.getElementById('prevBtn').disabled = currentPage === 1;
+        document.getElementById('nextBtn').disabled = reels.length < pageSize;
+        document.getElementById('pageInfo').textContent = `Page ${currentPage}`;
+        document.getElementById('selectAll').checked = false;
       } catch (e) {}
+    }
+
+    function changePage(direction) {
+      currentPage += direction;
+      if (currentPage < 1) currentPage = 1;
+      loadRecent();
     }
 
     function toggleSelectAll(el) {
