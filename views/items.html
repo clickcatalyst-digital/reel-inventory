@@ -1,0 +1,134 @@
+<!-- views/items.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Master Catalog | Reel Inventory</title>
+  <link rel="stylesheet" href="/public/css/style.css">
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <a href="/" class="nav-brand">LS TECHNOLOGY INVENTORY MGT</a>
+    <div class="nav-links">
+      <a href="/">Catalog</a>
+      <a href="/inward">Inward</a>
+      <a href="/outward">Outward</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Master Catalog</h1>
+      <p>Add and manage your component library</p>
+    </div>
+
+    <!-- ADD ITEM FORM -->
+    <div class="card">
+      <div class="card-title">Add New Item</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Item Code</label>
+          <input type="text" id="itemCode" class="form-control" placeholder="e.g. MLCC-100NF-0402">
+        </div>
+        <div class="form-group">
+          <label>Default SPQ</label>
+          <input type="number" id="defaultSpq" class="form-control" placeholder="e.g. 4000" min="1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="description" class="form-control" placeholder="e.g. MLCC 100nF 0402 X7R 50V">
+      </div>
+      <button class="btn btn-primary" onclick="addItem()">+ Add Item</button>
+    </div>
+
+    <!-- ITEMS TABLE -->
+    <div class="card">
+      <div class="card-title">All Items</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Item Code</th>
+              <th>Description</th>
+              <th>SPQ</th>
+              <th>Added</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="itemsTable">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/public/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', loadItems);
+
+    async function loadItems() {
+      try {
+        const items = await api('/api/items');
+        const tbody = document.getElementById('itemsTable');
+        if (!items.length) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No items yet. Add your first component above.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = items.map(item => `
+          <tr>
+            <td><strong>${item.item_code}</strong></td>
+            <td>${item.description}</td>
+            <td>${formatQty(item.default_spq)}</td>
+            <td>${formatDate(item.created_at)}</td>
+            <td>
+              <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.item_code}')">Delete</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {}
+    }
+
+    async function addItem() {
+      const item_code = document.getElementById('itemCode').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const default_spq = document.getElementById('defaultSpq').value;
+
+      if (!item_code || !description || !default_spq) {
+        return showToast('All fields are required', 'error');
+      }
+
+      try {
+        await api('/api/items', {
+          method: 'POST',
+          body: { item_code, description, default_spq: parseInt(default_spq) }
+        });
+        showToast(`${item_code} added to catalog`);
+        document.getElementById('itemCode').value = '';
+        document.getElementById('description').value = '';
+        document.getElementById('defaultSpq').value = '';
+        loadItems();
+      } catch (e) {}
+    }
+
+    async function deleteItem(itemCode) {
+      if (!confirm(`Delete ${itemCode}? This cannot be undone.`)) return;
+      try {
+        await api(`/api/items/${itemCode}`, { method: 'DELETE' });
+        showToast(`${itemCode} deleted`);
+        loadItems();
+      } catch (e) {}
+    }
+
+    document.querySelectorAll('.form-control').forEach(el => {
+      el.addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+    });
+  </script>
+
+</body>
+</html>

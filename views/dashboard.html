@@ -1,0 +1,278 @@
+<!-- views/dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Reel Inventory</title>
+  <link rel="stylesheet" href="/public/css/style.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <a href="/" class="nav-brand">LS TECHNOLOGY INVENTORY MGT</a>
+    <div class="nav-links">
+      <a href="/">Catalog</a>
+      <a href="/inward">Inward</a>
+      <a href="/outward">Outward</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <p>Search, trace, and export your inventory</p>
+    </div>
+
+    <!-- STOCK SUMMARY -->
+    <div class="card" id="summaryCard">
+      <div class="card-title">Stock Summary</div>
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-box">
+          <div class="stat-value" id="totalItems">-</div>
+          <div class="stat-label">Items</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="totalReels">-</div>
+          <div class="stat-label">Total Reels</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="inStockReels">-</div>
+          <div class="stat-label">In Stock</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="outwardedReels">-</div>
+          <div class="stat-label">Outwarded</div>
+        </div>
+      </div>
+
+      <!-- Stock by item table -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Item Code</th>
+              <th>Description</th>
+              <th>SPQ</th>
+              <th>In Stock Reels</th>
+              <th>Total Qty</th>
+            </tr>
+          </thead>
+          <tbody id="summaryTable">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SEARCH & FILTER -->
+    <div class="card">
+      <div class="card-title">Search & Trace</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Reel Number</label>
+          <input type="text" id="searchReel" class="form-control" placeholder="REEL-XXXXX">
+        </div>
+        <div class="form-group">
+          <label>Item Code</label>
+          <input type="text" id="searchItem" class="form-control" placeholder="Item code">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Customer</label>
+          <input type="text" id="searchCustomer" class="form-control" placeholder="Customer name">
+        </div>
+        <div class="form-group">
+          <label>Invoice</label>
+          <input type="text" id="searchInvoice" class="form-control" placeholder="Invoice number">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Status</label>
+          <select id="searchStatus" class="form-control">
+            <option value="">All</option>
+            <option value="In Stock">In Stock</option>
+            <option value="Outwarded">Outwarded</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date Range</label>
+          <div style="display:flex;gap:8px">
+            <input type="date" id="searchDateFrom" class="form-control">
+            <input type="date" id="searchDateTo" class="form-control">
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="searchReels()">Search</button>
+        <button class="btn btn-ghost" onclick="clearSearch()">Clear</button>
+      </div>
+    </div>
+
+    <!-- SEARCH RESULTS -->
+    <div class="card" id="resultsCard" style="display:none">
+      <div class="card-title">
+        Results <span id="resultCount" style="font-weight:400;color:var(--text-muted)"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Reel</th>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Status</th>
+              <th>Inwarded</th>
+              <th>Customer</th>
+              <th>Invoice</th>
+              <th>Outwarded</th>
+            </tr>
+          </thead>
+          <tbody id="resultsTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EXPORT -->
+    <div class="card">
+      <div class="card-title">Export Data</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Stock As On Date</label>
+          <input type="date" id="exportDate" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Filter Status</label>
+          <select id="exportStatus" class="form-control">
+            <option value="">All</option>
+            <option value="In Stock">In Stock Only</option>
+            <option value="Outwarded">Outwarded Only</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-success" onclick="exportCSV()">Download CSV</button>
+    </div>
+  </div>
+
+  <script src="/public/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', loadSummary);
+
+    async function loadSummary() {
+      try {
+        const summary = await api('/api/dashboard/stock-summary');
+        let totalReels = 0, inStock = 0, totalQty = 0;
+
+        const tbody = document.getElementById('summaryTable');
+        if (!summary.length) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No data yet</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = summary.map(s => {
+          totalReels += s.total_reels || 0;
+          inStock += s.in_stock_reels || 0;
+          totalQty += s.total_quantity || 0;
+          return `
+            <tr>
+              <td><strong>${s.item_code}</strong></td>
+              <td>${s.description}</td>
+              <td>${formatQty(s.default_spq)}</td>
+              <td>${s.in_stock_reels || 0}</td>
+              <td>${formatQty(s.total_quantity || 0)}</td>
+            </tr>
+          `;
+        }).join('');
+
+        document.getElementById('totalItems').textContent = summary.length;
+        document.getElementById('totalReels').textContent = totalReels;
+        document.getElementById('inStockReels').textContent = inStock;
+        document.getElementById('outwardedReels').textContent = totalReels - inStock;
+      } catch (e) {}
+    }
+
+    async function searchReels() {
+      const params = new URLSearchParams();
+      const reel = document.getElementById('searchReel').value.trim();
+      const item = document.getElementById('searchItem').value.trim();
+      const customer = document.getElementById('searchCustomer').value.trim();
+      const invoice = document.getElementById('searchInvoice').value.trim();
+      const status = document.getElementById('searchStatus').value;
+      const dateFrom = document.getElementById('searchDateFrom').value;
+      const dateTo = document.getElementById('searchDateTo').value;
+
+      if (reel) params.set('reel_number', reel);
+      if (item) params.set('item_code', item);
+      if (customer) params.set('customer', customer);
+      if (invoice) params.set('invoice', invoice);
+      if (status) params.set('status', status);
+      if (dateFrom) params.set('date_from', dateFrom);
+      if (dateTo) params.set('date_to', dateTo);
+
+      if (!params.toString()) return showToast('Enter at least one search filter', 'error');
+
+      try {
+        const results = await api(`/api/dashboard/search?${params}`);
+        const card = document.getElementById('resultsCard');
+        const tbody = document.getElementById('resultsTable');
+
+        card.style.display = 'block';
+        document.getElementById('resultCount').textContent = `(${results.length} found)`;
+
+        if (!results.length) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No results found</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = results.map(r => {
+          const lastOutward = r.outward_history.length ? r.outward_history[r.outward_history.length - 1] : null;
+          return `
+            <tr>
+              <td><strong>${r.reel_number}</strong></td>
+              <td>${r.item_code}</td>
+              <td>${formatQty(r.quantity)}</td>
+              <td>${statusBadge(r.status)}</td>
+              <td>${formatDate(r.inward_date)}</td>
+              <td>${lastOutward ? lastOutward.customer_name : '—'}</td>
+              <td>${lastOutward ? lastOutward.invoice_number : '—'}</td>
+              <td>${lastOutward ? formatDate(lastOutward.outward_date) : '—'}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (e) {}
+    }
+
+    function clearSearch() {
+      document.getElementById('searchReel').value = '';
+      document.getElementById('searchItem').value = '';
+      document.getElementById('searchCustomer').value = '';
+      document.getElementById('searchInvoice').value = '';
+      document.getElementById('searchStatus').value = '';
+      document.getElementById('searchDateFrom').value = '';
+      document.getElementById('searchDateTo').value = '';
+      document.getElementById('resultsCard').style.display = 'none';
+    }
+
+    function exportCSV() {
+      const params = new URLSearchParams();
+      const date = document.getElementById('exportDate').value;
+      const status = document.getElementById('exportStatus').value;
+      if (date) params.set('as_on_date', date);
+      if (status) params.set('status', status);
+
+      const url = `/api/dashboard/export${params.toString() ? '?' + params : ''}`;
+      window.location.href = url;
+      showToast('CSV download started');
+    }
+
+    // Search on Enter key
+    document.querySelectorAll('#searchReel, #searchItem, #searchCustomer, #searchInvoice').forEach(el => {
+      el.addEventListener('keydown', e => { if (e.key === 'Enter') searchReels(); });
+    });
+  </script>
+
+</body>
+</html>

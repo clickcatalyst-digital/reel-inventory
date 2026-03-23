@@ -1,0 +1,421 @@
+<!-- views/outward.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Outward | Reel Inventory</title>
+  <link rel="stylesheet" href="/public/css/style.css">
+  <style>
+    .cart-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 6px; font-size: 13px; background: var(--surface);
+    }
+    .cart-item .cart-info { display: flex; gap: 12px; align-items: center; }
+    .cart-item .cart-reel { font-weight: 700; }
+    .cart-item .cart-meta { color: var(--text-muted); font-size: 11px; }
+    .cart-item .cart-remove {
+      background: none; border: none; color: var(--danger); cursor: pointer;
+      font-size: 16px; font-weight: 700; padding: 0 4px; font-family: var(--font);
+    }
+    .cart-item .cart-remove:hover { color: #991b1b; }
+    .cart-item.cart-skipped {
+      background: var(--danger-bg); border-color: #fecaca; text-decoration: line-through;
+      color: var(--text-muted);
+    }
+    .cart-count {
+      display: inline-block; background: var(--primary); color: #fff; font-size: 11px;
+      font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="/" class="nav-brand">LS TECHNOLOGY INVENTORY MGT</a>
+    <div class="nav-links">
+      <a href="/">Catalog</a>
+      <a href="/inward">Inward</a>
+      <a href="/outward">Outward</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Outward Stock</h1>
+      <p>Scan reels or boxes to build a shipment, then submit</p>
+    </div>
+
+    <!-- Step 1: Scan to add to cart -->
+    <div class="card">
+      <div class="card-title">Scan / Add Reels</div>
+      <div style="margin-bottom:14px;">
+        <button class="btn btn-ghost btn-sm" id="toggleCamera" onclick="toggleScanner()">Open Camera Scanner</button>
+      </div>
+      <div id="scannerContainer" class="scanner-box" style="display:none;">
+        <div id="reader"></div>
+      </div>
+      <div class="form-group">
+        <label>Reel / Box Number</label>
+        <input type="text" id="scanInput" class="form-control" placeholder="Scan QR or type number — keeps adding to cart" autofocus>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+          Scan a reel to add it. Scan a box to add all its in-stock reels. Keep scanning to build your shipment.
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="addToCart()">Add to Cart</button>
+    </div>
+
+    <!-- Cart -->
+    <div class="card" id="cartCard" style="display:none;">
+      <div class="card-title">Shipment Cart <span class="cart-count" id="cartCount">0</span></div>
+      <div id="cartList"></div>
+      <div id="cartSkipped" style="display:none; margin-top:8px;"></div>
+      <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Customer Name</label>
+            <input type="text" id="customerName" class="form-control" placeholder="e.g. ABC Electronics">
+          </div>
+          <div class="form-group">
+            <label>Invoice Number</label>
+            <input type="text" id="invoiceNumber" class="form-control" placeholder="e.g. INV-2025-001">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <input type="text" id="outwardNotes" class="form-control" placeholder="e.g. Urgent shipment">
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-success" style="flex:1;" onclick="submitCart()" id="submitBtn">Outward All</button>
+          <button class="btn btn-ghost" onclick="clearCart()">Clear Cart</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Outwards -->
+    <div class="card">
+      <div class="card-title">Recent Outwards</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Reel</th><th>Box</th><th>Item</th><th>Customer</th><th>Invoice</th><th>Qty</th><th>Type</th><th>Date</th><th></th></tr>
+          </thead>
+          <tbody id="recentOutwards">
+            <tr><td colspan="9" style="text-align:center; color:var(--text-muted);">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="/public/js/app.js"></script>
+  <script>
+    let cart = []; // { reel_number, item_code, description, quantity, box_number }
+    let skipped = []; // { reel_number, reason }
+    let html5QrCode = null;
+    let scannerActive = false;
+
+    // === SCANNER ===
+    function toggleScanner() {
+      const container = document.getElementById('scannerContainer');
+      const btn = document.getElementById('toggleCamera');
+      if (scannerActive) {
+        stopScanner(); container.style.display = 'none'; btn.textContent = 'Open Camera Scanner';
+      } else {
+        container.style.display = 'block'; btn.textContent = 'Close Camera'; startScanner();
+      }
+    }
+
+    function startScanner() {
+      html5QrCode = new Html5Qrcode('reader');
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          document.getElementById('scanInput').value = decodedText;
+          addToCart();
+        },
+        () => {}
+      ).then(() => { scannerActive = true; }).catch(err => {
+        showToast('Camera access denied or unavailable', 'error');
+      });
+    }
+
+    function stopScanner() {
+      if (html5QrCode && scannerActive) {
+        html5QrCode.stop().then(() => { scannerActive = false; }).catch(() => {});
+      }
+    }
+
+    // === ADD TO CART ===
+    async function addToCart() {
+      let raw = document.getElementById('scanInput').value.trim().toUpperCase();
+      if (!raw) return;
+
+      const inputs = raw.includes(',') ? raw.split(',').map(s => s.trim()).filter(Boolean) : [raw];
+
+      document.getElementById('scanInput').value = '';
+      document.getElementById('scanInput').focus();
+
+      for (const input of inputs) {
+        await addSingleToCart(input);
+      }
+    }
+
+    async function addSingleToCart(input) {
+      // Detect type
+      if (input.startsWith('BOX')) {
+        await addBoxToCart(input);
+      } else if (/^\d+$/.test(input)) {
+        try {
+          await addReelToCart('REEL-' + input);
+        } catch (e) {
+          try {
+            await addBoxToCart('BOX-' + input);
+          } catch (e2) {
+            showToast('Not found as reel or box', 'error');
+          }
+        }
+      } else if (input.startsWith('REEL')) {
+        await addReelToCart(input);
+      } else {
+        try { await addReelToCart(input); } catch(e) {
+          showToast('Not found', 'error');
+        }
+      }
+    }
+
+    async function addReelToCart(reelNumber) {
+      // Check if already in cart
+      if (cart.find(r => r.reel_number === reelNumber)) {
+        showToast(`${reelNumber} already in cart`, 'error');
+        return;
+      }
+
+      const reel = await api(`/api/outward/reel/${reelNumber}`);
+      cart.push({
+        reel_number: reel.reel_number,
+        item_code: reel.item_code,
+        description: reel.description,
+        quantity: reel.quantity,
+        box_number: reel.box_number || '—'
+      });
+      showToast(`Added ${reel.reel_number}`);
+      renderCart();
+    }
+
+    async function addBoxToCart(boxNumber) {
+      const data = await api(`/api/outward/box/${boxNumber}`);
+
+      let added = 0;
+      for (const reel of data.reels) {
+        if (reel.status === 'Outwarded') {
+          if (!skipped.find(s => s.reel_number === reel.reel_number)) {
+            skipped.push({ reel_number: reel.reel_number, reason: 'Already outwarded' });
+          }
+          continue;
+        }
+        if (cart.find(r => r.reel_number === reel.reel_number)) continue; // already in cart
+
+        cart.push({
+          reel_number: reel.reel_number,
+          item_code: reel.item_code,
+          description: reel.description,
+          quantity: reel.quantity,
+          box_number: data.box.box_number
+        });
+        added++;
+      }
+
+      if (added > 0) showToast(`Added ${added} reel(s) from ${boxNumber}`);
+      if (skipped.length > 0 && added === 0) showToast(`All reels in ${boxNumber} already outwarded or in cart`, 'error');
+      renderCart();
+    }
+
+    // === RENDER CART ===
+    function renderCart() {
+      const card = document.getElementById('cartCard');
+      const list = document.getElementById('cartList');
+      const countEl = document.getElementById('cartCount');
+      const skippedEl = document.getElementById('cartSkipped');
+      const btn = document.getElementById('submitBtn');
+
+      if (cart.length === 0 && skipped.length === 0) {
+        card.style.display = 'none';
+        return;
+      }
+
+      card.style.display = 'block';
+      countEl.textContent = cart.length;
+      btn.textContent = `Outward ${cart.length} Reel(s)`;
+      btn.disabled = cart.length === 0;
+
+      list.innerHTML = cart.map((r, i) => `
+        <div class="cart-item">
+          <div class="cart-info">
+            <span class="cart-reel">${r.reel_number}</span>
+            <span class="cart-meta">${r.item_code} · ${formatQty(r.quantity)} pcs · ${r.box_number}</span>
+          </div>
+          <button class="cart-remove" onclick="removeFromCart(${i})" title="Remove">×</button>
+        </div>
+      `).join('');
+
+      if (skipped.length > 0) {
+        skippedEl.style.display = 'block';
+        skippedEl.innerHTML = '<div style="font-size:11px; color:var(--warning); margin-bottom:4px;">Skipped (already outwarded):</div>' +
+          skipped.map(s => `<div class="cart-item cart-skipped"><span>${s.reel_number}</span><span class="cart-meta">${s.reason}</span></div>`).join('');
+      } else {
+        skippedEl.style.display = 'none';
+      }
+    }
+
+    function removeFromCart(index) {
+      const removed = cart.splice(index, 1);
+      showToast(`Removed ${removed[0].reel_number}`);
+      renderCart();
+    }
+
+    function clearCart() {
+      cart = [];
+      skipped = [];
+      renderCart();
+      document.getElementById('cartCard').style.display = 'none';
+      document.getElementById('customerName').value = '';
+      document.getElementById('invoiceNumber').value = '';
+      document.getElementById('outwardNotes').value = '';
+      document.getElementById('scanInput').focus();
+    }
+
+    // === SUBMIT CART ===
+    async function submitCart() {
+      if (cart.length === 0) return showToast('Cart is empty', 'error');
+
+      const customer_name = document.getElementById('customerName').value.trim();
+      const invoice_number = document.getElementById('invoiceNumber').value.trim();
+      const notes = document.getElementById('outwardNotes').value.trim();
+
+      if (!customer_name || !invoice_number) {
+        return showToast('Customer name and invoice number are required', 'error');
+      }
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+
+      let successCount = 0;
+      let errors = [];
+
+      for (const reel of cart) {
+        try {
+          await api('/api/outward', {
+            method: 'POST',
+            body: {
+              reel_number: reel.reel_number,
+              customer_name,
+              invoice_number,
+              outward_type: 'Full',
+              notes: notes || undefined
+            }
+          });
+          successCount++;
+        } catch (e) {
+          errors.push(`${reel.reel_number}: ${e.message}`);
+        }
+      }
+
+      if (successCount > 0) {
+        showToast(`${successCount} reel(s) outwarded successfully`);
+        // Auto-download packing list
+        await downloadPackingList(customer_name, invoice_number, cart, notes);
+      }
+      if (errors.length > 0) {
+        showToast(`${errors.length} failed: ${errors[0]}`, 'error');
+      }
+
+      clearCart();
+      loadRecentOutwards();
+      btn.disabled = false;
+      btn.textContent = 'Outward All';
+    }
+
+    // === PACKING LIST ===
+    async function downloadPackingList(customer, invoice, reels, notes) {
+      try {
+        const res = await fetch('/api/labels/packing-list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_name: customer,
+            invoice_number: invoice,
+            reels: reels,
+            notes: notes
+          })
+        });
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `packing_list_${invoice}_${Date.now()}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error('Packing list failed:', e);
+      }
+    }
+
+    async function regenPackingList(customer, invoice) {
+      try {
+        const outwards = await api('/api/outward/recent?limit=500');
+        const matching = outwards.filter(o => o.customer_name === customer && o.invoice_number === invoice);
+        if (!matching.length) return showToast('No outwards found for this invoice', 'error');
+
+        const reels = matching.map(o => ({
+          reel_number: o.reel_number,
+          item_code: o.item_code,
+          box_number: o.box_number || null,
+          quantity: o.quantity_shipped
+        }));
+
+        await downloadPackingList(customer, invoice, reels, '');
+        showToast('Packing list downloaded');
+      } catch (e) {
+        showToast('Failed to generate packing list', 'error');
+      }
+    }
+
+    // === ENTER KEY ===
+    document.getElementById('scanInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addToCart(); }
+    });
+
+    // === RECENT OUTWARDS ===
+    async function loadRecentOutwards() {
+      try {
+        const outwards = await api('/api/outward/recent?limit=20');
+        const tbody = document.getElementById('recentOutwards');
+        if (!outwards.length) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">No outwards yet</td></tr>';
+          return;
+        }
+        tbody.innerHTML = outwards.map(o => `
+          <tr>
+            <td><strong>${o.reel_number}</strong></td>
+            <td>${o.box_number || '—'}</td>
+            <td>${o.item_code}</td>
+            <td>${o.customer_name}</td>
+            <td>${o.invoice_number}</td>
+            <td>${formatQty(o.quantity_shipped)}</td>
+            <td><span class="badge ${o.outward_type === 'Full' ? 'badge-danger' : 'badge-warning'}">${o.outward_type}</span></td>
+            <td>${formatDateTime(o.outward_date)}</td>
+            <td><button class="btn btn-ghost btn-sm" onclick="regenPackingList('${o.customer_name}', '${o.invoice_number}')">PDF</button></td>
+          </tr>
+        `).join('');
+      } catch (e) {}
+    }
+
+    loadRecentOutwards();
+  </script>
+</body>
+</html>

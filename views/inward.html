@@ -1,0 +1,271 @@
+<!-- views/inward.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inward | Reel Inventory</title>
+  <link rel="stylesheet" href="/public/css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <a href="/" class="nav-brand">LS TECHNOLOGY INVENTORY MGT</a>
+    <div class="nav-links">
+      <a href="/">Catalog</a>
+      <a href="/inward">Inward</a>
+      <a href="/outward">Outward</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Inward Stock</h1>
+      <p>Receive new reels, assign to boxes, and generate QR labels</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Receive Reels</div>
+      <form id="inwardForm">
+        <div class="form-row-3">
+          <div class="form-group">
+            <label>Item Code</label>
+            <select id="itemSelect" class="form-control" required>
+              <option value="">— Select Item —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Number of Reels</label>
+            <input type="number" id="numReels" class="form-control" placeholder="e.g. 50" min="1" max="500" required>
+          </div>
+          <div class="form-group">
+            <label>Reels Per Box</label>
+            <input type="number" id="reelsPerBox" class="form-control" placeholder="0 = no box" min="0" max="500" value="0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <input type="text" id="inwardNotes" class="form-control" placeholder="e.g. Supplier batch #, PO number">
+        </div>
+        <div id="itemInfo" style="display:none; margin-bottom:14px;">
+          <div class="reel-info">
+            <div class="reel-meta" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+              <div><dt>Description</dt><dd id="infoDesc">—</dd></div>
+              <div><dt>Default SPQ</dt><dd id="infoSpq">—</dd></div>
+              <div><dt>Total Reels</dt><dd id="infoCount">—</dd></div>
+              <div><dt>Boxes</dt><dd id="infoBoxes">—</dd></div>
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Inward Reels</button>
+      </form>
+    </div>
+
+    <!-- Result -->
+    <div id="resultCard" class="card" style="display:none;">
+      <div class="card-title" id="resultTitle">Reels Created</div>
+      <div id="resultContent"></div>
+      <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="printReelLabels()">Download Reel Labels</button>
+        <button class="btn btn-ghost" id="boxLabelBtn" onclick="printBoxLabels()">Download Box Labels</button>
+        <button class="btn btn-ghost" onclick="resetForm()">Inward More</button>
+      </div>
+    </div>
+
+    <!-- Recent Inwards -->
+    <div class="card">
+      <div class="card-title">Recent Inwards</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+              <th>Reel</th>
+              <th>Box</th>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Status</th>
+              <th>Date & Time</th>
+            </tr>
+          </thead>
+          <tbody id="recentTable">
+            <tr><td colspan="7" style="text-align:center; color:var(--text-muted);">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="btn btn-ghost" onclick="reprintSelected()">Reprint Selected Labels</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/public/js/app.js"></script>
+  <script>
+    let lastResult = null;
+    let itemsCache = [];
+
+    async function loadItemDropdown() {
+      try {
+        itemsCache = await api('/api/items');
+        const select = document.getElementById('itemSelect');
+        select.innerHTML = '<option value="">— Select Item —</option>' +
+          itemsCache.map(i => `<option value="${i.item_code}">${i.item_code} — ${i.description}</option>`).join('');
+      } catch (e) {}
+    }
+
+    document.getElementById('itemSelect').addEventListener('change', updateInfo);
+    document.getElementById('numReels').addEventListener('input', updateInfo);
+    document.getElementById('reelsPerBox').addEventListener('input', updateInfo);
+
+    function updateInfo() {
+      const code = document.getElementById('itemSelect').value;
+      const numReels = parseInt(document.getElementById('numReels').value) || 0;
+      const perBox = parseInt(document.getElementById('reelsPerBox').value) || 0;
+      const info = document.getElementById('itemInfo');
+      const item = itemsCache.find(i => i.item_code === code);
+
+      if (item) {
+        info.style.display = 'block';
+        document.getElementById('infoDesc').textContent = item.description;
+        document.getElementById('infoSpq').textContent = formatQty(item.default_spq) + ' per reel';
+        document.getElementById('infoCount').textContent = numReels ? `${numReels} reel(s)` : '—';
+
+        if (perBox === 0) {
+          document.getElementById('infoBoxes').textContent = 'No boxes';
+        } else if (numReels > 0 && numReels % perBox !== 0) {
+          document.getElementById('infoBoxes').textContent = `⚠️ ${numReels} not divisible by ${perBox}`;
+        } else if (numReels > 0) {
+          document.getElementById('infoBoxes').textContent = `${numReels / perBox} box(es), ${perBox} per box`;
+        } else {
+          document.getElementById('infoBoxes').textContent = '—';
+        }
+      } else {
+        info.style.display = 'none';
+      }
+    }
+
+    document.getElementById('inwardForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const numReels = parseInt(document.getElementById('numReels').value);
+      const perBox = parseInt(document.getElementById('reelsPerBox').value) || 0;
+
+      if (perBox > 0 && numReels % perBox !== 0) {
+        return showToast(`${numReels} reels is not evenly divisible by ${perBox} per box`, 'error');
+      }
+
+      const numBoxes = perBox > 0 ? numReels / perBox : 0;
+
+      try {
+        const data = await api('/api/inward', {
+          method: 'POST',
+          body: {
+            item_code: document.getElementById('itemSelect').value,
+            num_reels: numReels,
+            num_boxes: numBoxes,
+            notes: document.getElementById('inwardNotes').value
+          }
+        });
+        lastResult = data;
+        showToast(data.message);
+
+        // Show grouped result
+        let html = '';
+        if (data.boxes.length > 0) {
+          for (const box of data.boxes) {
+            html += `<div style="margin-bottom:12px;">
+              <strong>${box.box_number}</strong> — ${box.reel_count} reel(s)
+              <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+                ${box.reels.map(r => r.reel_number).join(', ')}
+              </div>
+            </div>`;
+          }
+        } else {
+          html = `<div style="font-size:12px; color:var(--text-muted);">
+            ${data.reels.map(r => r.reel_number).join(', ')}
+          </div>`;
+        }
+        document.getElementById('resultContent').innerHTML = html;
+        document.getElementById('resultTitle').textContent = data.boxes.length > 0 ? 'Reels & Boxes Created' : 'Reels Created';
+        document.getElementById('boxLabelBtn').style.display = data.boxes.length > 0 ? 'inline-flex' : 'none';
+        loadRecent();
+      } catch (e) {}
+    });
+
+    async function printReelLabels() {
+      if (!lastResult) return;
+      const reelNumbers = lastResult.reels.map(r => r.reel_number);
+      await downloadPDF('/api/labels/generate', { reel_numbers: reelNumbers }, 'reel_labels');
+    }
+
+    async function printBoxLabels() {
+      if (!lastResult) return;
+      const boxNumbers = lastResult.boxes.map(b => b.box_number);
+      await downloadPDF('/api/labels/generate-box', { box_numbers: boxNumbers }, 'box_labels');
+    }
+
+    async function downloadPDF(url, body, prefix) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const blob = await res.blob();
+        const link = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = link;
+        a.download = `${prefix}_${Date.now()}.pdf`;
+        a.click();
+        URL.revokeObjectURL(link);
+        showToast('PDF downloaded');
+      } catch (e) {
+        showToast('Failed to generate PDF', 'error');
+      }
+    }
+
+    function resetForm() {
+      document.getElementById('inwardForm').reset();
+      document.getElementById('resultCard').style.display = 'none';
+      document.getElementById('itemInfo').style.display = 'none';
+      lastResult = null;
+    }
+
+    async function loadRecent() {
+      try {
+        const reels = await api('/api/inward/recent?limit=30');
+        const tbody = document.getElementById('recentTable');
+        if (!reels.length) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No inwards yet</td></tr>';
+          return;
+        }
+        tbody.innerHTML = reels.map(r => `
+          <tr>
+            <td><input type="checkbox" class="reel-check" value="${r.reel_number}"></td>
+            <td><strong>${r.reel_number}</strong></td>
+            <td>${r.box_number || '—'}</td>
+            <td>${r.item_code}</td>
+            <td>${formatQty(r.quantity)}</td>
+            <td>${statusBadge(r.status)}</td>
+            <td>${formatDateTime(r.inward_date)}</td>
+          </tr>
+        `).join('');
+      } catch (e) {}
+    }
+
+    function toggleSelectAll(el) {
+      document.querySelectorAll('.reel-check').forEach(cb => cb.checked = el.checked);
+    }
+
+    async function reprintSelected() {
+      const selected = [...document.querySelectorAll('.reel-check:checked')].map(cb => cb.value);
+      if (!selected.length) return showToast('Select at least one reel', 'error');
+      await downloadPDF('/api/labels/generate', { reel_numbers: selected }, 'labels_reprint');
+    }
+
+    loadItemDropdown();
+    loadRecent();
+  </script>
+</body>
+</html>
