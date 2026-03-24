@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard | Reel Inventory</title>
   <link rel="stylesheet" href="/public/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -96,6 +97,7 @@
             <option value="">All</option>
             <option value="In Stock">In Stock</option>
             <option value="Outwarded">Outwarded</option>
+            <option value="Deleted">Deleted</option>
           </select>
         </div>
         <div class="form-group">
@@ -121,6 +123,7 @@
         <table>
           <thead>
             <tr>
+              <th><input type="checkbox" id="selectAllResults" onchange="toggleSelectAllResults(this)"></th>
               <th>Reel</th>
               <th>Item</th>
               <th>Qty</th>
@@ -133,6 +136,9 @@
           </thead>
           <tbody id="resultsTable"></tbody>
         </table>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="btn btn-danger btn-sm" onclick="deleteSelected()">Delete Selected</button>
       </div>
     </div>
 
@@ -155,7 +161,93 @@
       </div>
       <button class="btn btn-success" onclick="exportCSV()">Download CSV</button>
     </div>
-  </div>
+
+    <!-- ALERTS -->
+    <div class="analytics-grid" id="alertsGrid" style="display:none;">
+      <div class="card" id="deadStockCard" style="border-left: 3px solid var(--danger);">
+        <div class="card-title" style="color:var(--danger);">⚠️ Dead Stock — No Movement 30+ Days</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Item</th><th>Description</th><th>In Stock</th><th>Qty</th><th>Last Outward</th></tr></thead>
+            <tbody id="deadStockTable"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" id="lowStockCard" style="border-left: 3px solid var(--warning);">
+        <div class="card-title" style="color:var(--warning);">⚠️ Low Stock — Below 5 Reels</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Item</th><th>Description</th><th>Reels</th><th>Qty</th></tr></thead>
+            <tbody id="lowStockTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="analytics-grid">
+      <div class="card">
+        <div class="card-title">Monthly Inward vs Outward</div>
+        <div class="chart-container"><canvas id="trendsChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Inventory Over Time</div>
+        <div class="chart-container"><canvas id="inventoryChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="analytics-grid">
+      <div class="card">
+        <div class="card-title">Item Velocity — Last 90 Days</div>
+        <div class="chart-container"><canvas id="velocityChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Avg Days to Ship (by Item)</div>
+        <div class="chart-container"><canvas id="agingChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="analytics-grid">
+      <div class="card">
+        <div class="card-title">Stock Aging — Oldest In-Stock Reels</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Reel</th><th>Item</th><th>Days in Stock</th></tr></thead>
+            <tbody id="agingTable">
+              <tr><td colspan="3" style="text-align:center;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Top Customers</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Customer</th><th>Reels</th><th>Quantity</th><th>Invoices</th></tr></thead>
+            <tbody id="customersTable">
+              <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOW ANALYTICS WORK -->
+    <div class="card">
+      <div class="card-title" style="cursor:pointer;" onclick="document.getElementById('analyticsHelp').style.display = document.getElementById('analyticsHelp').style.display === 'none' ? 'block' : 'none'">
+        ℹ️ How Analytics Are Calculated <span style="float:right; font-size:10px;">click to expand</span>
+      </div>
+      <div id="analyticsHelp" style="display:none; font-size:13px; line-height:1.8; color:var(--text-muted);">
+        <p><strong>Dead Stock (30+ days)</strong> — Items that have reels in stock but no outward in the last 30 days. If an item was never outwarded, it shows "Never sold". Calculated by comparing today's date with the most recent outward date per item.</p>
+        <p style="margin-top:10px;"><strong>Low Stock (below 5 reels)</strong> — Items with fewer than 5 reels currently in stock. Red = 0 reels (out of stock), Yellow = 1-2 reels (critical), Normal = 3-4 reels (low). Threshold is 5 reels.</p>
+        <p style="margin-top:10px;"><strong>Monthly Inward vs Outward</strong> — Count of reels inwarded and outwarded each month for the last 12 months. Helps spot if you're stocking more than you're selling or vice versa.</p>
+        <p style="margin-top:10px;"><strong>Inventory Over Time</strong> — Running total of inventory quantity (inwards minus outwards) over the last 12 months. Shows if your overall stock is growing or shrinking.</p>
+        <p style="margin-top:10px;"><strong>Item Velocity (90 days)</strong> — How many reels and total quantity shipped per item in the last 90 days. Items on the right move fastest. Items missing from the chart had zero outwards.</p>
+        <p style="margin-top:10px;"><strong>Avg Days to Ship</strong> — For outwarded reels, the average number of days between inward date and outward date, grouped by item. Higher = slower moving stock.</p>
+        <p style="margin-top:10px;"><strong>Stock Aging</strong> — The 20 oldest reels currently in stock, sorted by how many days they've been sitting. Green = under 14 days, Yellow = 14-30 days, Red = over 30 days.</p>
+        <p style="margin-top:10px;"><strong>Top Customers</strong> — Customers ranked by total quantity shipped across all their invoices.</p>
+      </div>
+    </div>
 
   <script src="/public/js/app.js"></script>
   <script>
@@ -223,7 +315,7 @@
         document.getElementById('resultCount').textContent = `(${results.length} found)`;
 
         if (!results.length) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No results found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">No results found</td></tr>';
           return;
         }
 
@@ -231,6 +323,7 @@
           const lastOutward = r.outward_history.length ? r.outward_history[r.outward_history.length - 1] : null;
           return `
             <tr>
+              <td><input type="checkbox" class="result-check" value="${r.reel_number}"></td>
               <td><strong>${r.reel_number}</strong></td>
               <td>${r.item_code}</td>
               <td>${formatQty(r.quantity)}</td>
@@ -272,6 +365,208 @@
     document.querySelectorAll('#searchReel, #searchItem, #searchCustomer, #searchInvoice').forEach(el => {
       el.addEventListener('keydown', e => { if (e.key === 'Enter') searchReels(); });
     });
+    function toggleSelectAllResults(el) {
+      document.querySelectorAll('.result-check').forEach(cb => cb.checked = el.checked);
+    }
+
+    async function deleteSelected() {
+      const checked = [...document.querySelectorAll('.result-check:checked')];
+      if (!checked.length) return showToast('Select at least one reel', 'error');
+
+      const reelNumbers = checked.map(cb => cb.value);
+
+      try {
+        const preview = await api('/api/dashboard/delete-preview', {
+          method: 'POST',
+          body: { reel_numbers: reelNumbers }
+        });
+
+        const confirmMsg = `You are about to delete ${preview.total} reel(s):\n\n` +
+          `• In Stock: ${preview.in_stock}\n` +
+          `• Outwarded: ${preview.outwarded}\n` +
+          `• Already Deleted: ${preview.already_deleted}\n` +
+          `• Total Quantity: ${formatQty(preview.total_quantity)}\n\n` +
+          `Enter password to confirm:`;
+
+        const password = prompt(confirmMsg);
+        if (!password) return;
+
+        const result = await api('/api/dashboard/delete', {
+          method: 'POST',
+          body: { reel_numbers: reelNumbers, password }
+        });
+
+        showToast(result.message);
+        searchReels();
+        loadSummary();
+      } catch (e) {}
+    }
+
+    // === ANALYTICS ===
+    async function loadAnalytics() {
+      try {
+        const data = await api('/api/dashboard/analytics');
+
+        // 1. Monthly Trends Chart
+        if (data.monthlyTrends.length) {
+          new Chart(document.getElementById('trendsChart'), {
+            type: 'bar',
+            data: {
+              labels: data.monthlyTrends.map(m => m.month),
+              datasets: [
+                { label: 'Inwarded', data: data.monthlyTrends.map(m => m.inwarded), backgroundColor: '#16a34a' },
+                { label: 'Outwarded', data: data.monthlyTrends.map(m => m.outwarded), backgroundColor: '#dc2626' }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: { y: { beginAtZero: true } },
+              plugins: { legend: { position: 'top' } }
+            }
+          });
+        }
+
+        // 2. Aging - in stock table
+        const agingTbody = document.getElementById('agingTable');
+        if (data.agingInStock.length) {
+          agingTbody.innerHTML = data.agingInStock.map(r => {
+            const color = r.days_in_stock > 30 ? 'var(--danger)' : r.days_in_stock > 14 ? 'var(--warning)' : 'var(--success)';
+            return `<tr>
+              <td><strong>${r.reel_number}</strong></td>
+              <td>${r.item_code}</td>
+              <td style="color:${color};font-weight:700;">${r.days_in_stock} days</td>
+            </tr>`;
+          }).join('');
+        } else {
+          agingTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted)">No in-stock reels</td></tr>';
+        }
+
+        // Aging - avg days to ship chart
+        if (data.agingOutwarded.length) {
+          new Chart(document.getElementById('agingChart'), {
+            type: 'bar',
+            data: {
+              labels: data.agingOutwarded.map(a => a.item_code),
+              datasets: [{
+                label: 'Avg Days to Ship',
+                data: data.agingOutwarded.map(a => a.avg_days_to_ship),
+                backgroundColor: '#d97706'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              indexAxis: 'y',
+              scales: { x: { beginAtZero: true } },
+              plugins: { legend: { display: false } }
+            }
+          });
+        }
+
+        // 3. Velocity chart
+        if (data.velocity.length) {
+          new Chart(document.getElementById('velocityChart'), {
+            type: 'bar',
+            data: {
+              labels: data.velocity.map(v => v.item_code),
+              datasets: [
+                { label: 'Reels Shipped', data: data.velocity.map(v => v.outward_count), backgroundColor: '#2563eb' },
+                { label: 'Qty Shipped', data: data.velocity.map(v => v.total_shipped), backgroundColor: '#93c5fd' }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: { y: { beginAtZero: true } },
+              plugins: { legend: { position: 'top' } }
+            }
+          });
+        }
+
+        // 4. Top customers table
+        const custTbody = document.getElementById('customersTable');
+        if (data.topCustomers.length) {
+          custTbody.innerHTML = data.topCustomers.map(c => `
+            <tr>
+              <td><strong>${c.customer_name}</strong></td>
+              <td>${c.reel_count}</td>
+              <td>${formatQty(c.total_quantity)}</td>
+              <td>${c.invoice_count}</td>
+            </tr>
+          `).join('');
+        } else {
+          custTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No outwards yet</td></tr>';
+        }
+
+        // 5. Inventory over time
+        if (data.inventoryTimeline.length) {
+          new Chart(document.getElementById('inventoryChart'), {
+            type: 'line',
+            data: {
+              labels: data.inventoryTimeline.map(m => m.month),
+              datasets: [{
+                label: 'Cumulative Inventory',
+                data: data.inventoryTimeline.map(m => m.quantity),
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                fill: true,
+                tension: 0.3
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: { y: { beginAtZero: true } },
+              plugins: { legend: { display: false } }
+            }
+          });
+        }
+
+        // 6. Dead stock alerts
+        const deadTbody = document.getElementById('deadStockTable');
+        const lowTbody = document.getElementById('lowStockTable');
+        const alertsGrid = document.getElementById('alertsGrid');
+
+        alertsGrid.style.display = 'grid';
+
+        if (data.deadStock.length) {
+          deadTbody.innerHTML = data.deadStock.map(d => `
+            <tr>
+              <td><strong>${d.item_code}</strong></td>
+              <td>${d.description}</td>
+              <td>${d.in_stock_reels}</td>
+              <td>${formatQty(d.total_quantity)}</td>
+              <td style="color:var(--danger); font-weight:700;">${d.last_outward_date ? formatDate(d.last_outward_date) + ' (' + d.days_since_last_outward + 'd ago)' : 'Never sold'}</td>
+            </tr>
+          `).join('');
+        } else {
+          deadTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--success); font-weight:700;">✅ All items moving — no dead stock</td></tr>';
+        }
+
+        // 7. Low stock alerts
+        if (data.lowStock.length) {
+          lowTbody.innerHTML = data.lowStock.map(l => {
+            const color = l.in_stock_reels === 0 ? 'var(--danger)' : l.in_stock_reels <= 2 ? 'var(--warning)' : 'var(--text)';
+            return `
+              <tr>
+                <td><strong>${l.item_code}</strong></td>
+                <td>${l.description}</td>
+                <td style="color:${color}; font-weight:700;">${l.in_stock_reels || 0} reels</td>
+                <td>${formatQty(l.total_quantity || 0)}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          lowTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--success); font-weight:700;">✅ All items above minimum stock</td></tr>';
+        }
+
+      } catch (e) {
+        console.error('Analytics failed:', e);
+      }
+    }
+
+    loadAnalytics();
   </script>
 
 </body>

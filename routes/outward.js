@@ -13,6 +13,7 @@ router.get('/reel/:reelNumber', (req, res) => {
 
   if (!reel) return res.status(404).json({ error: 'Reel not found' });
   if (reel.status === 'Outwarded') return res.status(400).json({ error: 'Reel already fully outwarded', reel });
+  if (reel.status === 'Deleted') return res.status(400).json({ error: 'Reel has been deleted', reel });
   res.json(reel);
 });
 

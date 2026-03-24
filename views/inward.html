@@ -192,6 +192,7 @@
           </div>`;
         }
         document.getElementById('resultContent').innerHTML = html;
+        document.getElementById('resultCard').style.display = 'block';
         document.getElementById('resultTitle').textContent = data.boxes.length > 0 ? 'Reels & Boxes Created' : 'Reels Created';
         document.getElementById('boxLabelBtn').style.display = data.boxes.length > 0 ? 'inline-flex' : 'none';
         loadRecent();

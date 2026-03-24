@@ -50,11 +50,7 @@ function formatDateTime(dateStr) {
 
 // ========== STATUS BADGE ==========
 function statusBadge(status) {
-  const map = {
-    'In Stock': 'badge-success',
-    'Outwarded': 'badge-danger',
-    'Partial': 'badge-warning'
-  };
+  const map = { 'In Stock': 'badge-success', 'Outwarded': 'badge-danger', 'Partial': 'badge-warning', 'Deleted': 'badge-danger' };
   return `<span class="badge ${map[status] || 'badge-warning'}">${status}</span>`;
 }
 

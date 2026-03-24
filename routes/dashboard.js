@@ -1,7 +1,7 @@
 // routes/dashboard.js
 const express = require('express');
 const router = express.Router();
-const { queryAll } = require('../db/schema');
+const { queryAll, queryOne, execute } = require('../db/schema');
 
 router.get('/search', (req, res) => {
   const { reel_number, item_code, customer, invoice, status, box_number, date_from, date_to } = req.query;
@@ -51,7 +51,7 @@ router.get('/stock-summary', (req, res) => {
   if (as_on_date) {
     query = `
       SELECT i.item_code, i.description, i.default_spq,
-        COUNT(r.id) as total_reels,
+        COUNT(CASE WHEN r.status != 'Deleted' THEN r.id END) as total_reels,
         SUM(CASE WHEN r.status = 'In Stock' THEN 1 ELSE 0 END) as in_stock_reels,
         SUM(CASE WHEN r.status = 'In Stock' THEN r.quantity ELSE 0 END) as total_quantity
       FROM items i
@@ -62,7 +62,7 @@ router.get('/stock-summary', (req, res) => {
   } else {
     query = `
       SELECT i.item_code, i.description, i.default_spq,
-        COUNT(r.id) as total_reels,
+        COUNT(CASE WHEN r.status != 'Deleted' THEN r.id END) as total_reels,
         SUM(CASE WHEN r.status = 'In Stock' THEN 1 ELSE 0 END) as in_stock_reels,
         SUM(CASE WHEN r.status = 'In Stock' THEN r.quantity ELSE 0 END) as total_quantity
       FROM items i
@@ -82,7 +82,7 @@ router.get('/export', (req, res) => {
     FROM reels r
     JOIN items i ON r.item_code = i.item_code
     LEFT JOIN outwards o ON r.reel_number = o.reel_number
-    WHERE 1=1
+    WHERE r.status != 'Deleted'
   `;
   const params = [];
 
@@ -101,6 +101,218 @@ router.get('/export', (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename=inventory_${new Date().toISOString().split('T')[0]}.csv`);
   res.send([headers, ...csvRows].join('\n'));
+});
+
+// POST soft delete reels
+router.post('/delete', (req, res) => {
+  const { reel_numbers, box_numbers, password } = req.body;
+
+  if (password !== 'admin123') {
+    return res.status(403).json({ error: 'Incorrect password' });
+  }
+
+  let reelsToDelete = [];
+
+  // Collect reels from box numbers
+  if (box_numbers && box_numbers.length) {
+    for (const bn of box_numbers) {
+      const boxReels = queryAll('SELECT reel_number FROM reels WHERE box_number = ?', [bn]);
+      reelsToDelete.push(...boxReels.map(r => r.reel_number));
+    }
+  }
+
+  // Add individual reel numbers
+  if (reel_numbers && reel_numbers.length) {
+    reelsToDelete.push(...reel_numbers);
+  }
+
+  // Deduplicate
+  reelsToDelete = [...new Set(reelsToDelete)];
+
+  if (!reelsToDelete.length) {
+    return res.status(400).json({ error: 'No reels or boxes specified' });
+  }
+
+  // Get stats before deleting
+  const stats = { in_stock: 0, outwarded: 0, already_deleted: 0 };
+  for (const rn of reelsToDelete) {
+    const reel = queryOne('SELECT status FROM reels WHERE reel_number = ?', [rn]);
+    if (!reel) continue;
+    if (reel.status === 'Deleted') stats.already_deleted++;
+    else if (reel.status === 'Outwarded') stats.outwarded++;
+    else stats.in_stock++;
+  }
+
+  // Soft delete
+  let deleted = 0;
+  for (const rn of reelsToDelete) {
+    const result = execute("UPDATE reels SET status = 'Deleted', quantity = 0 WHERE reel_number = ? AND status != 'Deleted'", [rn]);
+    deleted += result.changes;
+  }
+
+  res.json({
+    success: true,
+    message: `${deleted} reel(s) marked as deleted`,
+    stats
+  });
+});
+
+// POST get delete preview (stats before confirming)
+router.post('/delete-preview', (req, res) => {
+  const { reel_numbers, box_numbers } = req.body;
+
+  let reelsToCheck = [];
+
+  if (box_numbers && box_numbers.length) {
+    for (const bn of box_numbers) {
+      const boxReels = queryAll('SELECT reel_number, status, quantity, item_code FROM reels WHERE box_number = ?', [bn]);
+      reelsToCheck.push(...boxReels);
+    }
+  }
+
+  if (reel_numbers && reel_numbers.length) {
+    for (const rn of reel_numbers) {
+      const reel = queryOne('SELECT reel_number, status, quantity, item_code, box_number FROM reels WHERE reel_number = ?', [rn]);
+      if (reel && !reelsToCheck.find(r => r.reel_number === reel.reel_number)) {
+        reelsToCheck.push(reel);
+      }
+    }
+  }
+
+  const stats = {
+    total: reelsToCheck.length,
+    in_stock: reelsToCheck.filter(r => r.status === 'In Stock').length,
+    outwarded: reelsToCheck.filter(r => r.status === 'Outwarded').length,
+    already_deleted: reelsToCheck.filter(r => r.status === 'Deleted').length,
+    total_quantity: reelsToCheck.filter(r => r.status !== 'Deleted').reduce((s, r) => s + (r.quantity || 0), 0),
+    reels: reelsToCheck
+  };
+
+  res.json(stats);
+});
+
+// GET analytics data
+router.get('/analytics', (req, res) => {
+  // 1. Monthly inward vs outward trends (last 12 months)
+  const monthlyTrends = queryAll(`
+    SELECT 
+      strftime('%Y-%m', date) as month,
+      SUM(inward_count) as inwarded,
+      SUM(outward_count) as outwarded
+    FROM (
+      SELECT inward_date as date, 1 as inward_count, 0 as outward_count FROM reels WHERE status != 'Deleted'
+      UNION ALL
+      SELECT outward_date as date, 0 as inward_count, 1 as outward_count FROM outwards
+    )
+    WHERE date >= date('now', '-12 months')
+    GROUP BY month
+    ORDER BY month
+  `);
+
+  // 2. Stock aging (average days in stock for outwarded reels + current age for in-stock)
+  const agingOutwarded = queryAll(`
+    SELECT r.item_code,
+      ROUND(AVG(julianday(o.outward_date) - julianday(r.inward_date)), 1) as avg_days_to_ship
+    FROM reels r
+    JOIN outwards o ON r.reel_number = o.reel_number
+    WHERE r.status = 'Outwarded'
+    GROUP BY r.item_code
+    ORDER BY avg_days_to_ship DESC
+  `);
+
+  const agingInStock = queryAll(`
+    SELECT reel_number, item_code,
+      CAST(julianday('now') - julianday(inward_date) AS INTEGER) as days_in_stock
+    FROM reels
+    WHERE status = 'In Stock'
+    ORDER BY days_in_stock DESC
+    LIMIT 20
+  `);
+
+  // 3. Item velocity (outward count per item, last 90 days)
+  const velocity = queryAll(`
+    SELECT r.item_code, i.description,
+      COUNT(o.id) as outward_count,
+      SUM(o.quantity_shipped) as total_shipped
+    FROM outwards o
+    JOIN reels r ON o.reel_number = r.reel_number
+    JOIN items i ON r.item_code = i.item_code
+    WHERE o.outward_date >= date('now', '-90 days')
+    GROUP BY r.item_code
+    ORDER BY outward_count DESC
+  `);
+
+  // 4. Top customers (by reel count and quantity)
+  const topCustomers = queryAll(`
+    SELECT customer_name,
+      COUNT(id) as reel_count,
+      SUM(quantity_shipped) as total_quantity,
+      COUNT(DISTINCT invoice_number) as invoice_count
+    FROM outwards
+    GROUP BY customer_name
+    ORDER BY total_quantity DESC
+    LIMIT 10
+  `);
+
+  // 5. Inventory over time (monthly snapshot of in-stock quantity)
+  const inventoryOverTime = queryAll(`
+    SELECT 
+      strftime('%Y-%m', date) as month,
+      SUM(change) as net_change
+    FROM (
+      SELECT inward_date as date, quantity as change FROM reels WHERE status != 'Deleted'
+      UNION ALL
+      SELECT outward_date as date, -quantity_shipped as change FROM outwards
+    )
+    WHERE date >= date('now', '-12 months')
+    GROUP BY month
+    ORDER BY month
+  `);
+
+  // Calculate cumulative inventory
+  let cumulative = 0;
+  const inventoryTimeline = inventoryOverTime.map(m => {
+    cumulative += m.net_change;
+    return { month: m.month, quantity: cumulative };
+  });
+
+  // 6. Dead stock (items with zero outward in last 30 days but have stock)
+  const deadStock = queryAll(`
+    SELECT i.item_code, i.description,
+      COUNT(r.id) as in_stock_reels,
+      SUM(r.quantity) as total_quantity,
+      MAX(o.outward_date) as last_outward_date,
+      CAST(julianday('now') - julianday(MAX(o.outward_date)) AS INTEGER) as days_since_last_outward
+    FROM items i
+    JOIN reels r ON i.item_code = r.item_code AND r.status = 'In Stock'
+    LEFT JOIN outwards o ON r.reel_number = o.reel_number
+    GROUP BY i.item_code
+    HAVING MAX(o.outward_date) IS NULL OR julianday('now') - julianday(MAX(o.outward_date)) > 30
+    ORDER BY days_since_last_outward DESC
+  `);
+
+  // 7. Low stock (items with fewer than 5 reels in stock)
+  const lowStock = queryAll(`
+    SELECT i.item_code, i.description, i.default_spq,
+      COUNT(r.id) as in_stock_reels,
+      SUM(r.quantity) as total_quantity
+    FROM items i
+    LEFT JOIN reels r ON i.item_code = r.item_code AND r.status = 'In Stock'
+    GROUP BY i.item_code
+    HAVING in_stock_reels < 5
+    ORDER BY in_stock_reels ASC
+  `);
+
+  res.json({
+    monthlyTrends,
+    agingOutwarded,
+    agingInStock,
+    velocity,
+    topCustomers,
+    inventoryTimeline,
+    deadStock,
+    lowStock
+  });
 });
 
 module.exports = router;
