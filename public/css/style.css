@@ -193,7 +193,9 @@ select.form-control {
   gap: 12px;
 }
 
+/* Desktop */
 .date-range { display: flex; gap: 8px; }
+.date-range .form-control { min-width: 0; }
 
 /* ========== BUTTONS ========== */
 .btn {
@@ -555,6 +557,12 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
   .cog-menu { display: block; }
   .theme-toggle { display: none; } /* hide desktop toggle on mobile, cog handles it */
 
+  /* Prevent any card inside analytics-grid from bleeding outside */
+  .analytics-grid .card {
+    overflow: hidden;
+    min-width: 0; /* critical — prevents flex/grid children from overflowing */
+  }
+
   /* ── Hide desktop nav links, keep brand ── */
   .nav-links { display: none; }
   .nav { height: 48px; padding: 0 16px; }
@@ -630,7 +638,9 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
     stroke-linejoin: round;
   }
 
-  .date-range { flex-direction: column; gap: 6px; }
+  /* Date range — full width stacked */
+  .date-range { flex-direction: column; gap: 6px; width: 100%; }
+  .date-range .form-control { width: 100%; min-width: 0; font-size: 16px; }
 
   /* ── Body padding so content clears tab bar ── */
   body { padding-bottom: 72px; }
@@ -714,17 +724,20 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
   .btn-row { flex-direction: column; }
   .btn-row .btn { width: 100%; }
 
-  /* Dead stock & low stock — hide description on mobile to prevent overflow */
+  /* Dead stock & low stock — contained horizontal scroll */
+  #deadStockTable-container,
+  #lowStockTable-container {
+    width: 100%;
+    overflow: hidden;
+  }
   #deadStockTable-container .table-wrap,
   #lowStockTable-container .table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    display: block;
+    width: 100%;
   }
-
-  /* Compress these specific tables on mobile */
   #deadStockTable-container table,
   #lowStockTable-container table {
-    min-width: 480px; /* forces scroll rather than squashing */
+    min-width: 420px;
   }
 }
