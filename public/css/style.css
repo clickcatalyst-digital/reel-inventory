@@ -651,6 +651,10 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
     gap: 6px;
     width: 100%;
   }
+  input[type="date"].form-control {
+    min-height: 50px;
+    line-height: 1.5;
+  }
   .date-range input[type="date"] {
     display: block !important;
     width: 100% !important;
