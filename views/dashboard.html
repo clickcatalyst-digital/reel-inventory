@@ -365,40 +365,6 @@
 
     document.addEventListener('DOMContentLoaded', loadSummary);
 
-    // async function loadSummary() {
-    //   try {
-    //     const summary = await api('/api/dashboard/stock-summary');
-    //     summary.sort((a, b) => a.item_code.localeCompare(b.item_code));
-    //     let totalReels = 0, inStock = 0, totalQty = 0;
-
-    //     const tbody = document.getElementById('summaryTable');
-    //     if (!summary.length) {
-    //       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No data yet</td></tr>';
-    //       return;
-    //     }
-
-    //     tbody.innerHTML = summary.map(s => {
-    //       totalReels += s.total_reels || 0;
-    //       inStock += s.in_stock_reels || 0;
-    //       totalQty += s.total_quantity || 0;
-    //       return `
-    //         <tr style="cursor:pointer;" onclick="showItemTrend('${s.item_code}')">
-    //           <td><strong>${s.item_code}</strong></td>
-    //           <td>${s.description}</td>
-    //           <td>${formatQty(s.default_spq)}</td>
-    //           <td>${s.in_stock_reels || 0}</td>
-    //           <td>${formatQty(s.total_quantity || 0)}</td>
-    //         </tr>
-    //       `;
-    //     }).join('');
-
-    //     document.getElementById('totalItems').textContent = summary.length;
-    //     document.getElementById('totalReels').textContent = totalReels;
-    //     document.getElementById('inStockReels').textContent = inStock;
-    //     document.getElementById('outwardedReels').textContent = totalReels - inStock;
-    //   } catch (e) {}
-    // }
-
     async function loadSummary() {
       try {
         const summary = await api('/api/dashboard/stock-summary');
@@ -563,21 +529,6 @@
         // 2. Aging - in stock table
         tables.aging.load(data.agingInStock);
 
-        // 2. Aging - in stock table
-        // const agingTbody = document.getElementById('agingTable');
-        // if (data.agingInStock.length) {
-        //   agingTbody.innerHTML = data.agingInStock.map(r => {
-        //     const color = r.days_in_stock > 30 ? 'var(--danger)' : r.days_in_stock > 14 ? 'var(--warning)' : 'var(--success)';
-        //     return `<tr>
-        //       <td><strong>${r.reel_number}</strong></td>
-        //       <td>${r.item_code}</td>
-        //       <td style="color:${color};font-weight:700;">${r.days_in_stock} days</td>
-        //     </tr>`;
-        //   }).join('');
-        // } else {
-        //   agingTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted)">No in-stock reels</td></tr>';
-        // }
-
         // Aging - avg days to ship chart
         if (data.agingOutwarded.length) {
           new Chart(document.getElementById('agingChart'), {
@@ -623,21 +574,6 @@
         // 4. Top customers table
         tables.customers.load(data.topCustomers);
 
-        // 4. Top customers table
-        // const custTbody = document.getElementById('customersTable');
-        // if (data.topCustomers.length) {
-        //   custTbody.innerHTML = data.topCustomers.map(c => `
-        //     <tr>
-        //       <td><strong>${c.customer_name}</strong></td>
-        //       <td>${c.reel_count}</td>
-        //       <td>${formatQty(c.total_quantity)}</td>
-        //       <td>${c.invoice_count}</td>
-        //     </tr>
-        //   `).join('');
-        // } else {
-        //   custTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No outwards yet</td></tr>';
-        // }
-
         // 5. Inventory over time
         if (data.inventoryTimeline.length) {
           new Chart(document.getElementById('inventoryChart'), {
@@ -663,8 +599,6 @@
         }
 
         // 6. Dead stock alerts
-        // const deadTbody = document.getElementById('deadStockTable');
-        // const lowTbody = document.getElementById('lowStockTable');
         const alertsGrid = document.getElementById('alertsGrid');
 
         alertsGrid.style.display = '';
@@ -672,38 +606,8 @@
 
         tables.deadStock.load(data.deadStock);
 
-        // if (data.deadStock.length) {
-        //   deadTbody.innerHTML = data.deadStock.map(d => `
-        //     <tr>
-        //       <td><strong>${d.item_code}</strong></td>
-        //       <td>${d.description}</td>
-        //       <td>${d.in_stock_reels}</td>
-        //       <td>${formatQty(d.total_quantity)}</td>
-        //       <td style="color:var(--danger); font-weight:700;">${d.last_outward_date ? formatDate(d.last_outward_date) + ' (' + d.days_since_last_outward + 'd ago)' : 'Never sold'}</td>
-        //     </tr>
-        //   `).join('');
-        // } else {
-        //   deadTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--success); font-weight:700;">✅ All items moving — no dead stock</td></tr>';
-        // }
-
         // 7. Low stock alerts
         tables.lowStock.load(data.lowStock);
-
-        // if (data.lowStock.length) {
-        //   lowTbody.innerHTML = data.lowStock.map(l => {
-        //     const color = l.in_stock_reels === 0 ? 'var(--danger)' : l.in_stock_reels <= 2 ? 'var(--warning)' : 'var(--text)';
-        //     return `
-        //       <tr>
-        //         <td><strong>${l.item_code}</strong></td>
-        //         <td>${l.description}</td>
-        //         <td style="color:${color}; font-weight:700;">${l.in_stock_reels || 0} reels</td>
-        //         <td>${formatQty(l.total_quantity || 0)}</td>
-        //       </tr>
-        //     `;
-        //   }).join('');
-        // } else {
-        //   lowTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--success); font-weight:700;">✅ All items above minimum stock</td></tr>';
-        // }
 
       } catch (e) {
         console.error('Analytics failed:', e);

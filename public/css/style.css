@@ -436,6 +436,7 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
   align-items: center;
   justify-content: space-between;
   margin-top: 12px;
+  margin-bottom: 8px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
   font-size: 11px;
