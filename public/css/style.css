@@ -146,6 +146,13 @@ select.form-control {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+.form-row-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.date-range { display: flex; gap: 8px; }
 
 /* ========== BUTTONS ========== */
 .btn {
@@ -335,13 +342,164 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
 .chart-container { position: relative; height: 220px; }
 .analytics-full { margin-bottom: 16px; }
 
-/* ========== MOBILE ========== */
-@media (max-width: 640px) {
-  .nav-links a { padding: 8px 8px; font-size: 10px; }
-  .form-row { grid-template-columns: 1fr; }
-  .reel-info .reel-meta { grid-template-columns: 1fr; }
+/* ========== MOBILE — replaces old 640px block ========== */
+@media (max-width: 768px) {
+
+  /* ── Hide desktop nav links, keep brand ── */
+  .nav-links { display: none; }
+  .nav { height: 48px; padding: 0 16px; }
+  .nav-brand { font-size: 13px; }
+
+  /* ── Bottom tab bar ── */
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: var(--text);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    z-index: 200;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottom-nav a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: #6b6b63;
+    text-decoration: none;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bottom-nav a svg {
+    width: 20px; height: 20px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .bottom-nav a.active,
+  .bottom-nav a:hover { color: #fff; }
+  .bottom-nav a.active svg { stroke: var(--primary); }
+
+  /* ── FAB ── */
+  .fab {
+    display: flex;
+    position: fixed;
+    bottom: 72px; /* tab bar height + gap */
+    right: 20px;
+    width: 52px; height: 52px;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(37,99,235,0.4);
+    z-index: 199;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .fab:active {
+    transform: scale(0.93);
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+  }
+  .fab svg {
+    width: 22px; height: 22px;
+    stroke: #fff; fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .date-range { flex-direction: column; gap: 6px; }
+
+  /* ── Body padding so content clears tab bar ── */
+  body { padding-bottom: 72px; }
+
+  /* ── Layout ── */
   .container { padding: 16px 12px; }
-  .page-header h1 { font-size: 17px; }
-  .analytics-grid { grid-template-columns: 1fr; }
-  .chart-container { height: 180px; }
+  .page-header { margin-bottom: 16px; }
+  .page-header h1 { font-size: 18px; }
+  .page-header p { font-size: 12px; }
+
+  /* ── Cards ── */
+  .card { padding: 16px; border-radius: 8px; margin-bottom: 12px; }
+  .card-title { font-size: 11px; margin-bottom: 12px; padding-bottom: 8px; }
+
+  /* ── Forms — single column, bigger tap targets ── */
+  .form-row { grid-template-columns: 1fr; gap: 0; }
+  .form-row-3 { grid-template-columns: 1fr; gap: 0; }
+  .form-group { margin-bottom: 12px; }
+  .form-control {
+    padding: 12px 14px;
+    font-size: 16px; /* prevents iOS zoom on focus */
+    border-radius: 8px;
+  }
+
+  /* ── Buttons — full width stacked, big tap targets ── */
+  .btn { padding: 13px 20px; font-size: 12px; border-radius: 8px; }
+  .btn-sm { padding: 9px 14px; font-size: 11px; }
+  .btn-block { width: 100%; }
+
+  /* ── Action button rows ── */
+  div[style*="display:flex"][style*="gap"] {
+    flex-wrap: wrap;
+  }
+
+  /* ── Tables — horizontal scroll with sticky first col ── */
+  .table-wrap { border-radius: 6px; border: 1px solid var(--border); }
+  table { font-size: 12px; }
+  thead th { padding: 8px 8px; font-size: 9px; }
+  tbody td { padding: 10px 8px; }
+
+  /* ── Stat boxes — 2 per row ── */
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .stat-box { padding: 12px 8px; }
+  .stat-box .stat-value { font-size: 20px; }
+  .stat-box .stat-label { font-size: 9px; }
+
+  /* ── Analytics — single column ── */
+  .analytics-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
+  .chart-container { height: 200px; }
+
+  /* ── Reel meta grid ── */
+  .reel-info .reel-meta { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .reel-info .reel-number { font-size: 15px; }
+
+  /* ── Cart items — better spacing ── */
+  .cart-item { padding: 10px 12px; }
+  .cart-item .cart-info { flex-wrap: wrap; gap: 4px; }
+
+  /* ── Toast — bottom center, above tab bar ── */
+  .toast {
+    bottom: 76px;
+    right: 12px;
+    left: 12px;
+    text-align: center;
+    font-size: 13px;
+  }
+
+  /* ── Scanner — full width ── */
+  .scanner-box { max-width: 100%; }
+}
+
+/* Desktop: never show mobile-only elements */
+@media (min-width: 769px) {
+  .bottom-nav { display: none !important; }
+  .fab { display: none !important; }
+}
+
+.btn-row { display: flex; gap: 8px; }
+@media (max-width: 768px) {
+  .btn-row { flex-direction: column; }
+  .btn-row .btn { width: 100%; }
 }

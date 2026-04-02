@@ -1,27 +1,22 @@
 // db/schema.js
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-const path = require('path');
+const { createClient } = require('@libsql/client');
 
-const DB_PATH = path.join(__dirname, '..', 'inventory.db');
 let db = null;
 
-function saveDB() {
-  const data = db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
-}
-
 async function initDB() {
-  const SQL = await initSqlJs();
-
-  if (fs.existsSync(DB_PATH)) {
-    const fileBuffer = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(fileBuffer);
+  // Use Turso if URL is set, otherwise fall back to local SQLite file
+  if (process.env.TURSO_URL) {
+    db = createClient({
+      url: process.env.TURSO_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN
+    });
+    console.log('Connected to Turso (cloud)');
   } else {
-    db = new SQL.Database();
+    db = createClient({ url: 'file:./inventory.db' });
+    console.log('Connected to local SQLite');
   }
 
-  db.run(`CREATE TABLE IF NOT EXISTS items (
+  await db.execute(`CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     item_code TEXT UNIQUE NOT NULL,
     description TEXT NOT NULL,
@@ -29,16 +24,15 @@ async function initDB() {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS boxes (
+  await db.execute(`CREATE TABLE IF NOT EXISTS boxes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     box_number TEXT UNIQUE NOT NULL,
     item_code TEXT NOT NULL,
     reel_count INTEGER NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (item_code) REFERENCES items(item_code)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS reels (
+  await db.execute(`CREATE TABLE IF NOT EXISTS reels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     reel_number TEXT UNIQUE NOT NULL,
     item_code TEXT NOT NULL,
@@ -46,12 +40,10 @@ async function initDB() {
     quantity INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'In Stock',
     inward_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    notes TEXT,
-    FOREIGN KEY (item_code) REFERENCES items(item_code),
-    FOREIGN KEY (box_number) REFERENCES boxes(box_number)
+    notes TEXT
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS outwards (
+  await db.execute(`CREATE TABLE IF NOT EXISTS outwards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     reel_number TEXT NOT NULL,
     customer_name TEXT NOT NULL,
@@ -59,62 +51,81 @@ async function initDB() {
     quantity_shipped INTEGER NOT NULL,
     outward_type TEXT NOT NULL DEFAULT 'Full',
     outward_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    notes TEXT,
-    FOREIGN KEY (reel_number) REFERENCES reels(reel_number)
+    notes TEXT
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS counters (
+  await db.execute(`CREATE TABLE IF NOT EXISTS counters (
     name TEXT PRIMARY KEY,
     value INTEGER NOT NULL DEFAULT 10000
   )`);
 
-  const reelCounter = db.exec("SELECT value FROM counters WHERE name = 'reel'");
-  if (!reelCounter.length) {
-    db.run("INSERT INTO counters (name, value) VALUES ('reel', 10000)");
+  await db.execute(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'user',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Seed counters
+  const reelCounter = await db.execute("SELECT value FROM counters WHERE name = 'reel'");
+  if (!reelCounter.rows.length) {
+    await db.execute("INSERT INTO counters (name, value) VALUES ('reel', 10000)");
   }
-  const boxCounter = db.exec("SELECT value FROM counters WHERE name = 'box'");
-  if (!boxCounter.length) {
-    db.run("INSERT INTO counters (name, value) VALUES ('box', 1000)");
+  const boxCounter = await db.execute("SELECT value FROM counters WHERE name = 'box'");
+  if (!boxCounter.rows.length) {
+    await db.execute("INSERT INTO counters (name, value) VALUES ('box', 1000)");
   }
 
-  saveDB();
+  // Seed default admin user if no users exist
+  const userCount = await db.execute("SELECT COUNT(*) as count FROM users");
+  if (userCount.rows[0].count === 0) {
+    await db.execute("INSERT INTO users (username, password, role) VALUES ('admin', 'admin123', 'admin')");
+    await db.execute("INSERT INTO users (username, password, role) VALUES ('pranav', 'lstech123', 'user')");
+    console.log('Default users created: admin/admin123, pranav/lstech123');
+  }
+
   return db;
 }
 
-function queryAll(sql, params = []) {
-  const stmt = db.prepare(sql);
-  if (params.length) stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) rows.push(stmt.getAsObject());
-  stmt.free();
-  return rows;
+async function queryAll(sql, params = []) {
+  const result = await db.execute({ sql, args: params });
+  return result.rows;
 }
 
-function queryOne(sql, params = []) {
-  const rows = queryAll(sql, params);
-  return rows.length ? rows[0] : null;
+async function queryOne(sql, params = []) {
+  const result = await db.execute({ sql, args: params });
+  return result.rows.length ? result.rows[0] : null;
 }
 
-function execute(sql, params = []) {
-  db.run(sql, params);
-  saveDB();
-  return { changes: db.getRowsModified() };
+async function execute(sql, params = []) {
+  const result = await db.execute({ sql, args: params });
+  return { changes: result.rowsAffected };
 }
 
-function getNextReelNumber() {
-  db.run("UPDATE counters SET value = value + 1 WHERE name = 'reel'");
-  const result = db.exec("SELECT value FROM counters WHERE name = 'reel'");
-  const value = result[0].values[0][0];
-  saveDB();
-  return `REEL-${value}`;
+async function getNextReelNumber() {
+  // Auto-heal: ensure counter is always ahead of actual max
+  await db.execute(`
+    UPDATE counters SET value = MAX(value, (
+      SELECT COALESCE(MAX(CAST(REPLACE(reel_number, 'REEL-', '') AS INTEGER)), 10000)
+      FROM reels
+    )) WHERE name = 'reel'
+  `);
+  await db.execute("UPDATE counters SET value = value + 1 WHERE name = 'reel'");
+  const result = await db.execute("SELECT value FROM counters WHERE name = 'reel'");
+  return `REEL-${result.rows[0].value}`;
 }
 
-function getNextBoxNumber() {
-  db.run("UPDATE counters SET value = value + 1 WHERE name = 'box'");
-  const result = db.exec("SELECT value FROM counters WHERE name = 'box'");
-  const value = result[0].values[0][0];
-  saveDB();
-  return `BOX-${value}`;
+async function getNextBoxNumber() {
+  await db.execute(`
+    UPDATE counters SET value = MAX(value, (
+      SELECT COALESCE(MAX(CAST(REPLACE(box_number, 'BOX-', '') AS INTEGER)), 1000)
+      FROM boxes
+    )) WHERE name = 'box'
+  `);
+  await db.execute("UPDATE counters SET value = value + 1 WHERE name = 'box'");
+  const result = await db.execute("SELECT value FROM counters WHERE name = 'box'");
+  return `BOX-${result.rows[0].value}`;
 }
 
-module.exports = { initDB, queryAll, queryOne, execute, getNextReelNumber, getNextBoxNumber, saveDB };
+module.exports = { initDB, queryAll, queryOne, execute, getNextReelNumber, getNextBoxNumber };

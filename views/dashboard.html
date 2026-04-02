@@ -17,6 +17,7 @@
       <a href="/inward">Inward</a>
       <a href="/outward">Outward</a>
       <a href="/dashboard">Dashboard</a>
+      <a href="/api/logout" style="color:#dc2626;">Logout</a>
     </div>
   </nav>
 
@@ -67,6 +68,14 @@
       </div>
     </div>
 
+    <!-- ITEM TREND POPUP -->
+    <div class="card" id="itemTrendCard" style="display:none;">
+      <div class="card-title">Selling Trend — <span id="trendItemCode"></span>
+        <span style="float:right; cursor:pointer; font-size:14px;" onclick="document.getElementById('itemTrendCard').style.display='none'">✕</span>
+      </div>
+      <div class="chart-container"><canvas id="itemTrendChart"></canvas></div>
+    </div>
+
     <!-- SEARCH & FILTER -->
     <div class="card">
       <div class="card-title">Search & Trace</div>
@@ -102,13 +111,13 @@
         </div>
         <div class="form-group">
           <label>Date Range</label>
-          <div style="display:flex;gap:8px">
+          <div class="date-range">
             <input type="date" id="searchDateFrom" class="form-control">
             <input type="date" id="searchDateTo" class="form-control">
           </div>
         </div>
       </div>
-      <div style="display:flex;gap:10px">
+      <div class="btn-row">
         <button class="btn btn-primary" onclick="searchReels()">Search</button>
         <button class="btn btn-ghost" onclick="clearSearch()">Clear</button>
       </div>
@@ -159,7 +168,10 @@
           </select>
         </div>
       </div>
-      <button class="btn btn-success" onclick="exportCSV()">Download CSV</button>
+      <div class="btn-row">
+        <button class="btn btn-success" onclick="exportCSV()">Download Full CSV</button>
+        <button class="btn btn-ghost" onclick="window.location.href='/api/dashboard/export-stock'; showToast('Stock export started');">Download Current Stock</button>
+      </div>
     </div>
 
     <!-- ALERTS -->
@@ -256,6 +268,7 @@
     async function loadSummary() {
       try {
         const summary = await api('/api/dashboard/stock-summary');
+        summary.sort((a, b) => a.item_code.localeCompare(b.item_code));
         let totalReels = 0, inStock = 0, totalQty = 0;
 
         const tbody = document.getElementById('summaryTable');
@@ -269,7 +282,7 @@
           inStock += s.in_stock_reels || 0;
           totalQty += s.total_quantity || 0;
           return `
-            <tr>
+            <tr style="cursor:pointer;" onclick="showItemTrend('${s.item_code}')">
               <td><strong>${s.item_code}</strong></td>
               <td>${s.description}</td>
               <td>${formatQty(s.default_spq)}</td>
@@ -566,8 +579,58 @@
       }
     }
 
+    let itemTrendChartInstance = null;
+
+    async function showItemTrend(itemCode) {
+      try {
+        const data = await api(`/api/dashboard/item-trend?item_code=${itemCode}`);
+        document.getElementById('trendItemCode').textContent = itemCode;
+        document.getElementById('itemTrendCard').style.display = 'block';
+
+        if (itemTrendChartInstance) itemTrendChartInstance.destroy();
+
+        itemTrendChartInstance = new Chart(document.getElementById('itemTrendChart'), {
+          type: 'bar',
+          data: {
+            labels: data.map(d => d.month),
+            datasets: [
+              { label: 'Inwarded', data: data.map(d => d.inwarded), backgroundColor: '#16a34a' },
+              { label: 'Outwarded', data: data.map(d => d.outwarded), backgroundColor: '#dc2626' }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true } },
+            plugins: { legend: { position: 'top' } }
+          }
+        });
+
+        document.getElementById('itemTrendCard').scrollIntoView({ behavior: 'smooth' });
+      } catch (e) {}
+    }
+
     loadAnalytics();
   </script>
+
+  <nav class="bottom-nav">
+    <a href="/">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Catalog
+    </a>
+    <a href="/inward">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      Inward
+    </a>
+    <a href="/outward">
+      <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      Outward
+    </a>
+    <a href="/dashboard" class="active">
+      <svg viewBox="0 0 24 24"><rect x="3" y="13" width="4" height="8"/><rect x="10" y="8" width="4" height="13"/><rect x="17" y="3" width="4" height="18"/></svg>
+      Dashboard
+    </a>
+  </nav>
 
 </body>
 </html>

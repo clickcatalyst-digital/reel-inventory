@@ -1,3 +1,4 @@
+// public/js/app.js
 // ========== API HELPER ==========
 async function api(url, options = {}) {
   try {

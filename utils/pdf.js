@@ -21,7 +21,7 @@ router.post('/generate', async (req, res) => {
   }
 
   const placeholders = reel_numbers.map(() => '?').join(',');
-  const reels = queryAll(`
+  const reels = await queryAll(`
     SELECT r.reel_number, r.item_code, r.quantity, r.inward_date, i.description
     FROM reels r
     JOIN items i ON r.item_code = i.item_code
@@ -101,7 +101,7 @@ router.post('/generate-box', async (req, res) => {
 
   const boxes = [];
   for (const bn of box_numbers) {
-    const box = queryAll(`
+    const box = await queryAll(`
       SELECT b.box_number, b.item_code, b.reel_count, i.description,
         GROUP_CONCAT(r.reel_number) as reel_list
       FROM boxes b

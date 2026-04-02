@@ -17,6 +17,7 @@
       <a href="/inward">Inward</a>
       <a href="/outward">Outward</a>
       <a href="/dashboard">Dashboard</a>
+      <a href="/api/logout" style="color:#dc2626;">Logout</a>
     </div>
   </nav>
 
@@ -74,7 +75,8 @@
 
     async function loadItems() {
       try {
-        const items = await api('/api/items');
+        let items = await api('/api/items');
+        items.sort((a, b) => a.item_code.localeCompare(b.item_code));
         const tbody = document.getElementById('itemsTable');
         if (!items.length) {
           tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No items yet. Add your first component above.</td></tr>';
@@ -129,6 +131,25 @@
       el.addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
     });
   </script>
+
+  <nav class="bottom-nav">
+    <a href="/" class="active">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Catalog
+    </a>
+    <a href="/inward">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      Inward
+    </a>
+    <a href="/outward">
+      <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      Outward
+    </a>
+    <a href="/dashboard">
+      <svg viewBox="0 0 24 24"><rect x="3" y="13" width="4" height="8"/><rect x="10" y="8" width="4" height="13"/><rect x="17" y="3" width="4" height="18"/></svg>
+      Dashboard
+    </a>
+  </nav>
 
 </body>
 </html>

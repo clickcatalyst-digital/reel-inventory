@@ -38,6 +38,7 @@
       <a href="/inward">Inward</a>
       <a href="/outward">Outward</a>
       <a href="/dashboard">Dashboard</a>
+      <a href="/api/logout" style="color:#dc2626;">Logout</a>
     </div>
   </nav>
 
@@ -86,7 +87,7 @@
           <label>Notes (optional)</label>
           <input type="text" id="outwardNotes" class="form-control" placeholder="e.g. Urgent shipment">
         </div>
-        <div style="display:flex; gap:8px;">
+        <div class="btn-row">
           <button class="btn btn-success" style="flex:1;" onclick="submitCart()" id="submitBtn">Outward All</button>
           <button class="btn btn-ghost" onclick="clearCart()">Clear Cart</button>
         </div>
@@ -112,10 +113,39 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="/public/js/app.js"></script>
   <script>
+    let isProcessingScan = false;
     let cart = []; // { reel_number, item_code, description, quantity, box_number }
     let skipped = []; // { reel_number, reason }
     let html5QrCode = null;
     let scannerActive = false;
+
+    // === SCAN SOUND ===
+    const scanSound = new AudioContext();
+    function playSuccessSound() {
+      const o = scanSound.createOscillator();
+      const g = scanSound.createGain();
+      o.connect(g);
+      g.connect(scanSound.destination);
+      o.type = 'sine';
+      o.frequency.setValueAtTime(880, scanSound.currentTime);
+      o.frequency.setValueAtTime(1320, scanSound.currentTime + 0.1);
+      g.gain.setValueAtTime(0.3, scanSound.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01, scanSound.currentTime + 0.3);
+      o.start(scanSound.currentTime);
+      o.stop(scanSound.currentTime + 0.3);
+    }
+    function playErrorSound() {
+      const o = scanSound.createOscillator();
+      const g = scanSound.createGain();
+      o.connect(g);
+      g.connect(scanSound.destination);
+      o.type = 'sine';
+      o.frequency.setValueAtTime(300, scanSound.currentTime);
+      g.gain.setValueAtTime(0.3, scanSound.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01, scanSound.currentTime + 0.4);
+      o.start(scanSound.currentTime);
+      o.stop(scanSound.currentTime + 0.4);
+    }
 
     // === SCANNER ===
     function toggleScanner() {
@@ -133,9 +163,14 @@
       html5QrCode.start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
+        async (decodedText) => {
+          if (isProcessingScan) return;          // ← lock: ignore while processing
+          isProcessingScan = true;
           document.getElementById('scanInput').value = decodedText;
-          addToCart();
+          await addToCart();                     // ← await it fully
+          setTimeout(() => {
+            isProcessingScan = false;            // ← unlock after 1.5s cooldown
+          }, 1000);
         },
         () => {}
       ).then(() => { scannerActive = true; }).catch(err => {
@@ -190,6 +225,7 @@
     async function addReelToCart(reelNumber) {
       // Check if already in cart
       if (cart.find(r => r.reel_number === reelNumber)) {
+        playErrorSound();
         showToast(`${reelNumber} already in cart`, 'error');
         return;
       }
@@ -202,6 +238,7 @@
         quantity: reel.quantity,
         box_number: reel.box_number || '—'
       });
+      playSuccessSound();
       showToast(`Added ${reel.reel_number}`);
       renderCart();
     }
@@ -229,8 +266,8 @@
         added++;
       }
 
-      if (added > 0) showToast(`Added ${added} reel(s) from ${boxNumber}`);
-      if (skipped.length > 0 && added === 0) showToast(`All reels in ${boxNumber} already outwarded or in cart`, 'error');
+      if (added > 0) { playSuccessSound(); showToast(`Added ${added} reel(s) from ${boxNumber}`); }
+      if (skipped.length > 0 && added === 0) { playErrorSound(); showToast(`All reels in ${boxNumber} already outwarded or in cart`, 'error'); }
       renderCart();
     }
 
@@ -417,5 +454,28 @@
 
     loadRecentOutwards();
   </script>
+
+  <nav class="bottom-nav">
+    <a href="/">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Catalog
+    </a>
+    <a href="/inward">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      Inward
+    </a>
+    <a href="/outward" class="active">
+      <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      Outward
+    </a>
+    <a href="/dashboard">
+      <svg viewBox="0 0 24 24"><rect x="3" y="13" width="4" height="8"/><rect x="10" y="8" width="4" height="13"/><rect x="17" y="3" width="4" height="18"/></svg>
+      Dashboard
+    </a>
+  </nav>
+
+  <button class="fab" onclick="document.getElementById('scanInput').focus(); window.scrollTo({top:0,behavior:'smooth'});" title="Scan Reel">
+    <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+  </button>
 </body>
 </html>
