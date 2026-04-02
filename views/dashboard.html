@@ -547,7 +547,7 @@
         showToast(result.message);
         searchReels();
         loadSummary();
-      } catch (e) {}
+      } catch (e) { console.error('Delete failed:', e); }
     }
 
     // === ANALYTICS ===

@@ -1,28 +1,30 @@
-// server.js
 require('dotenv').config();
 const express = require('express');
-const session = require('express-session');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
+const bcrypt = require('bcrypt');
 const path = require('path');
 const os = require('os');
 const { initDB, queryOne } = require('./db/schema');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret';
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback-secret-change-me',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 } // 7 days
-}));
-
-// Auth middleware
 function requireLogin(req, res, next) {
-  if (req.session && req.session.user) return next();
+  const token = req.headers['authorization']?.replace('Bearer ', '')
+    || req.cookies?.token;
+  if (token) {
+    try {
+      req.user = jwt.verify(token, JWT_SECRET);
+      return next();
+    } catch (e) {}
+  }
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Not authenticated' });
   res.redirect('/login');
 }
@@ -30,22 +32,28 @@ function requireLogin(req, res, next) {
 (async () => {
   await initDB();
 
-  // Login routes (no auth required)
   app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views', 'login.html')));
 
   app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
-    const user = await queryOne('SELECT * FROM users WHERE username = ? AND password = ?', [username, password]);
+    const user = await queryOne('SELECT * FROM users WHERE username = ?', [username]);
     if (!user) return res.status(401).json({ error: 'Invalid username or password' });
 
-    req.session.user = { id: user.id, username: user.username, role: user.role };
-    res.json({ success: true, username: user.username });
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ error: 'Invalid username or password' });
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+    res.json({ success: true, username: user.username, token });
   });
 
   app.get('/api/logout', (req, res) => {
-    req.session.destroy();
+    res.clearCookie('token');
     res.redirect('/login');
   });
 
@@ -79,11 +87,8 @@ function requireLogin(req, res, next) {
   });
 })();
 
-
 // Keep-alive ping (free tier only)
-if (!process.env.RENDER_SERVICE_URL) {
-  // skip locally
-} else {
+if (process.env.RENDER_SERVICE_URL) {
   setInterval(() => {
     fetch(process.env.RENDER_SERVICE_URL).catch(() => {});
   }, 14 * 60 * 1000);
