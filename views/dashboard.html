@@ -206,7 +206,7 @@
     </div>
 
     <!-- ALERTS -->
-    <div class="analytics-grid" id="alertsGrid" style="display:none;">
+    <div class="analytics-grid alerts-grid" id="alertsGrid" style="display:none;">
       <div class="card" id="deadStockCard" style="border-left: 3px solid var(--danger);">
         <div id="deadStockTable-container"></div>
       </div>
@@ -682,7 +682,8 @@
         // const lowTbody = document.getElementById('lowStockTable');
         const alertsGrid = document.getElementById('alertsGrid');
 
-        alertsGrid.style.display = 'grid';
+        alertsGrid.style.display = '';
+        alertsGrid.classList.add('alerts-visible');
 
         tables.deadStock.load(data.deadStock);
 

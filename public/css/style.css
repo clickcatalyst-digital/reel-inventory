@@ -113,6 +113,7 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 24px 16px;
+  overflow-x: hidden;
 }
 .page-header {
   margin-bottom: 24px;
@@ -294,6 +295,12 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
 }
 .alert-success { background: var(--success-bg); color: var(--success); border: 1px solid #bbf7d0; }
 .alert-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid #fecaca; }
+.alerts-grid {
+  display: none;
+}
+.alerts-grid.alerts-visible {
+  display: grid;
+}
 
 /* ========== SCANNER AREA ========== */
 .scanner-box {
@@ -724,20 +731,39 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
   .btn-row { flex-direction: column; }
   .btn-row .btn { width: 100%; }
 
-  /* Dead stock & low stock — contained horizontal scroll */
+  /* Fix alerts grid overflow on mobile */
+  .alerts-grid {
+    display: none;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .alerts-grid.alerts-visible {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+  .alerts-grid.alerts-visible .card {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
   #deadStockTable-container,
   #lowStockTable-container {
     width: 100%;
+    max-width: 100%;
     overflow: hidden;
   }
   #deadStockTable-container .table-wrap,
   #lowStockTable-container .table-wrap {
+    width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    width: 100%;
   }
   #deadStockTable-container table,
   #lowStockTable-container table {
-    min-width: 420px;
+    min-width: 380px;
+    max-width: none;
   }
 }
