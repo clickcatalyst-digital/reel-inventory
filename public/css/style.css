@@ -645,17 +645,18 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
     stroke-linejoin: round;
   }
 
-  /* Secondary FAB — sits above primary FAB */
+  /* ── Secondary FAB — same style as primary ── */
   .fab-secondary {
-    bottom: 132px; /* 72px tab bar + 52px primary FAB + 8px gap */
-    background: var(--surface);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    bottom: 132px;
+    background: var(--primary);
+    border: none;
+    box-shadow: 0 4px 16px rgba(37,99,235,0.4);
   }
   .fab-secondary svg {
-    stroke: var(--text);
+    stroke: #fff;
   }
   .fab-secondary:active {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3);
   }
 
   /* Date range — full width stacked */
