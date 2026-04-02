@@ -646,8 +646,21 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
   }
 
   /* Date range — full width stacked */
-  .date-range { flex-direction: column; gap: 6px; width: 100%; }
-  .date-range .form-control { width: 100%; min-width: 0; font-size: 16px; }
+  .date-range {
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+  .date-range input[type="date"] {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: 16px;
+    box-sizing: border-box !important;
+    -webkit-appearance: none;
+    appearance: none;
+  }
 
   /* ── Body padding so content clears tab bar ── */
   body { padding-bottom: 72px; }
