@@ -680,9 +680,9 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
   .card-title { font-size: 11px; margin-bottom: 12px; padding-bottom: 8px; }
 
   /* ── Forms — single column, bigger tap targets ── */
-  .form-row { grid-template-columns: 1fr; gap: 0; }
+  .form-row { grid-template-columns: 1fr; gap: 0; width: 100%; min-width: 0; }
   .form-row-3 { grid-template-columns: 1fr; gap: 0; }
-  .form-group { margin-bottom: 12px; }
+  .form-group { margin-bottom: 12px; min-width: 0; width: 100%; }
   .form-control {
     padding: 12px 14px;
     font-size: 16px; /* prevents iOS zoom on focus */
