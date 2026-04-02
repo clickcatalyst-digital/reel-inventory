@@ -41,8 +41,8 @@ router.post('/', async (req, res) => {
         const boxReels = [];
         for (let r = 0; r < reelsInThisBox; r++) {
           const reelNumber = await getNextReelNumber();
-          await execute('INSERT INTO reels (reel_number, item_code, box_number, quantity, notes) VALUES (?, ?, ?, ?, ?)',
-            [reelNumber, item_code, boxNumber, item.default_spq, notes || null]);
+          await execute('INSERT INTO reels (reel_number, item_code, box_number, quantity, notes, inward_date) VALUES (?, ?, ?, ?, ?, ?)',
+            [reelNumber, item_code, boxNumber, item.default_spq, notes || null, nowIST()]);
           boxReels.push({ reel_number: reelNumber, item_code, quantity: item.default_spq });
           createdReels.push({ reel_number: reelNumber, item_code, quantity: item.default_spq, box_number: boxNumber });
         }
