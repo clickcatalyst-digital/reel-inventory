@@ -614,19 +614,6 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
   .bottom-nav a:hover { color: #fff; }
   .bottom-nav a.active svg { stroke: var(--primary); }
 
-  /* Secondary FAB — sits above primary FAB */
-  .fab-secondary {
-    bottom: 132px; /* 72px tab bar + 52px primary FAB + 8px gap */
-    background: var(--surface);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-  }
-  .fab-secondary svg {
-    stroke: var(--text);
-  }
-  .fab-secondary:active {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  }
-
   /* ── FAB ── */
   .fab {
     display: flex;
@@ -656,6 +643,19 @@ tbody tr:hover { background: rgba(0,0,0,0.015); }
     stroke-width: 2.5;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+
+  /* Secondary FAB — sits above primary FAB */
+  .fab-secondary {
+    bottom: 132px; /* 72px tab bar + 52px primary FAB + 8px gap */
+    background: var(--surface);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+  .fab-secondary svg {
+    stroke: var(--text);
+  }
+  .fab-secondary:active {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   }
 
   /* Date range — full width stacked */

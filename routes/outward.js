@@ -139,7 +139,9 @@ router.post('/box', async (req, res) => {
 router.get('/recent', async (req, res) => {
   const limit = parseInt(req.query.limit) || 50;
   const outwards = await queryAll(`
-    SELECT o.*, r.item_code, r.box_number, i.description
+    SELECT o.id, o.reel_number, o.customer_name, o.invoice_number, 
+           o.quantity_shipped, o.outward_type, o.outward_date, o.notes,
+           r.item_code, r.box_number, i.description
     FROM outwards o
     JOIN reels r ON o.reel_number = r.reel_number
     JOIN items i ON r.item_code = i.item_code
