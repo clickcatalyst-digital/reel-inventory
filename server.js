@@ -78,3 +78,13 @@ function requireLogin(req, res, next) {
     console.log('');
   });
 })();
+
+
+// Keep-alive ping (free tier only)
+if (!process.env.RENDER_SERVICE_URL) {
+  // skip locally
+} else {
+  setInterval(() => {
+    fetch(process.env.RENDER_SERVICE_URL).catch(() => {});
+  }, 14 * 60 * 1000);
+}
