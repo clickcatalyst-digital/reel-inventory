@@ -46,6 +46,10 @@
 [data-theme="dark"] .bottom-nav a { color: #4a4a43; }
 [data-theme="dark"] .bottom-nav a.active,
 [data-theme="dark"] .bottom-nav a:hover { color: #f0f0ec; }
+[data-theme="dark"] .card {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2);
+}
+
 
 body {
   font-family: var(--font);
@@ -135,7 +139,7 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 20px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
   margin-bottom: 16px;
 }
 .card-title {
