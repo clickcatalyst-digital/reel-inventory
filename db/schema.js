@@ -82,7 +82,9 @@ async function initDB() {
   if (userCount.rows[0].count === 0) {
     await db.execute("INSERT INTO users (username, password, role) VALUES ('admin', 'admin123', 'admin')");
     await db.execute("INSERT INTO users (username, password, role) VALUES ('pranav', 'lstech123', 'user')");
-    console.log('Default users created: admin/admin123, pranav/lstech123');
+    await db.execute("INSERT INTO users (username, password, role) VALUES ('zakir', 'lstech123', 'user')");
+    await db.execute("INSERT INTO users (username, password, role) VALUES ('sahil', 'lstech123', 'user')");
+    // console.log('Default users created: admin/admin123, pranav/lstech123');
   }
 
   return db;
