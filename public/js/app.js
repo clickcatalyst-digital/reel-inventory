@@ -84,16 +84,16 @@ function updateThemeIcon(theme) {
   const icon = document.getElementById('themeIcon');
   if (icon) {
     icon.innerHTML = theme === 'dark'
-      ? '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>'
-      : '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>';
+      ? '<path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75 9.75 9.75 0 0 1 8.25 6 9.72 9.72 0 0 1 9 2.252 9.75 9.75 0 0 0 3 12a9.75 9.75 0 0 0 9.75 9.75c2.385 0 4.575-.86 6.252-2.248Z"/>'
+      : '<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/>';
   }
   // Cog menu icon + label
   const cogIcon = document.getElementById('cogThemeIcon');
   const cogLabel = document.getElementById('cogThemeLabel');
   if (cogIcon) {
     cogIcon.innerHTML = theme === 'dark'
-      ? '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>'
-      : '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>';
+      ? '<path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75 9.75 9.75 0 0 1 8.25 6 9.72 9.72 0 0 1 9 2.252 9.75 9.75 0 0 0 3 12a9.75 9.75 0 0 0 9.75 9.75c2.385 0 4.575-.86 6.252-2.248Z"/>'
+      : '<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/>';
   }
   if (cogLabel) {
     cogLabel.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
