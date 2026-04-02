@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { queryAll, queryOne, execute } = require('../db/schema');
+const { queryAll, queryOne, execute, nowIST } = require('../db/schema');
 
 router.get('/reel/:reelNumber', async (req, res) => {
   const reel = await queryOne(`
@@ -68,9 +68,9 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    await execute(`INSERT INTO outwards (reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes)
-      VALUES (?, ?, ?, ?, ?, ?)`,
-      [reel_number, customer_name.trim(), invoice_number.trim(), qtyShipped, type, notes || null]);
+    await execute(`INSERT INTO outwards (reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes, outward_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [reel_number, customer_name.trim(), invoice_number.trim(), qtyShipped, type, notes || null, nowIST()]);
 
     if (type === 'Full') {
       await execute('UPDATE reels SET quantity = 0, status = ? WHERE reel_number = ?', ['Outwarded', reel_number]);
@@ -117,9 +117,9 @@ router.post('/box', async (req, res) => {
         continue;
       }
 
-      await execute(`INSERT INTO outwards (reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes)
-        VALUES (?, ?, ?, ?, 'Full', ?)`,
-        [reel.reel_number, customer_name.trim(), invoice_number.trim(), reel.quantity, notes || null]);
+      await execute(`INSERT INTO outwards (reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes, outward_date)
+        VALUES (?, ?, ?, ?, 'Full', ?, ?)`,
+        [reel.reel_number, customer_name.trim(), invoice_number.trim(), reel.quantity, notes || null, nowIST()]);
 
       await execute('UPDATE reels SET quantity = 0, status = ? WHERE reel_number = ?', ['Outwarded', reel.reel_number]);
       results.success.push(reel.reel_number);
@@ -147,6 +147,45 @@ router.get('/recent', async (req, res) => {
     LIMIT ?
   `, [limit]);
   res.json(outwards);
+});
+
+router.post('/undo', async (req, res) => {
+  const { outward_id, password } = req.body;
+
+  if (password !== 'admin123') {
+    return res.status(403).json({ error: 'Incorrect password' });
+  }
+
+  if (!outward_id) {
+    return res.status(400).json({ error: 'outward_id is required' });
+  }
+
+  // Get the outward record
+  const outward = await queryOne('SELECT * FROM outwards WHERE id = ?', [outward_id]);
+  if (!outward) return res.status(404).json({ error: 'Outward record not found' });
+
+  // Get the reel
+  const reel = await queryOne('SELECT * FROM reels WHERE reel_number = ?', [outward.reel_number]);
+  if (!reel) return res.status(404).json({ error: 'Reel not found' });
+
+  try {
+    // Restore reel quantity and status
+    const restoredQty = reel.quantity + outward.quantity_shipped;
+    await execute(
+      'UPDATE reels SET quantity = ?, status = ? WHERE reel_number = ?',
+      [restoredQty, 'In Stock', outward.reel_number]
+    );
+
+    // Delete the outward record
+    await execute('DELETE FROM outwards WHERE id = ?', [outward_id]);
+
+    res.json({
+      success: true,
+      message: `Outward undone — ${outward.reel_number} restored to In Stock with qty ${restoredQty}`
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

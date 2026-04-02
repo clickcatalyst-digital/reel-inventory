@@ -34,7 +34,8 @@ function showToast(message, type = 'success') {
 // ========== DATE FORMATTING ==========
 function formatDate(dateStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
+  // SQLite returns naive string — treat as IST directly
+  const d = new Date(dateStr.replace(' ', 'T') + '+05:30');
   return d.toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric'
   });
@@ -42,10 +43,11 @@ function formatDate(dateStr) {
 
 function formatDateTime(dateStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-IN', {
+  const d = new Date(dateStr.replace(' ', 'T') + '+05:30');
+  return d.toLocaleString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
+    hour: '2-digit', minute: '2-digit',
+    hour12: true
   });
 }
 

@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { queryAll, queryOne, execute, getNextReelNumber, getNextBoxNumber } = require('../db/schema');
+const { queryAll, queryOne, execute, getNextReelNumber, getNextBoxNumber, nowIST } = require('../db/schema');
 
 router.post('/', async (req, res) => {
   const { item_code, num_reels, num_boxes, notes } = req.body;
@@ -23,8 +23,8 @@ router.post('/', async (req, res) => {
     if (totalBoxes === 0) {
       for (let r = 0; r < totalReels; r++) {
         const reelNumber = await getNextReelNumber();
-        await execute('INSERT INTO reels (reel_number, item_code, box_number, quantity, notes) VALUES (?, ?, ?, ?, ?)',
-          [reelNumber, item_code, null, item.default_spq, notes || null]);
+        await execute('INSERT INTO reels (reel_number, item_code, box_number, quantity, notes, inward_date) VALUES (?, ?, ?, ?, ?, ?)',
+          [reelNumber, item_code, null, item.default_spq, notes || null, nowIST()]);
         createdReels.push({ reel_number: reelNumber, item_code, quantity: item.default_spq, box_number: null });
       }
     } else {
@@ -35,8 +35,8 @@ router.post('/', async (req, res) => {
         const boxNumber = await getNextBoxNumber();
         const reelsInThisBox = reelsPerBox + (b < remainder ? 1 : 0);
 
-        await execute('INSERT INTO boxes (box_number, item_code, reel_count) VALUES (?, ?, ?)',
-          [boxNumber, item_code, reelsInThisBox]);
+        await execute('INSERT INTO boxes (box_number, item_code, reel_count, created_at) VALUES (?, ?, ?, ?)',
+          [boxNumber, item_code, reelsInThisBox, nowIST()]);
 
         const boxReels = [];
         for (let r = 0; r < reelsInThisBox; r++) {

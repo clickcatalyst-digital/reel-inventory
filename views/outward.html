@@ -455,6 +455,23 @@
       }
     }
 
+    // UNDO
+    async function undoOutward(outwardId, reelNumber) {
+      const password = prompt(
+        `Undo outward for ${reelNumber}?\n\nThis will:\n• Delete the outward record\n• Restore reel to In Stock\n\nEnter password to confirm:`
+      );
+      if (!password) return;
+
+      try {
+        const result = await api('/api/outward/undo', {
+          method: 'POST',
+          body: { outward_id: outwardId, password }
+        });
+        showToast(result.message);
+        loadRecentOutwards();
+      } catch (e) {}
+    }
+
     // === ENTER KEY ===
     document.getElementById('scanInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); addToCart(); }
@@ -473,7 +490,12 @@
         { label: 'Qty', render: o => formatQty(o.quantity_shipped) },
         { label: 'Type', render: o => `<span class="badge ${o.outward_type === 'Full' ? 'badge-danger' : 'badge-warning'}">${o.outward_type}</span>` },
         { label: 'Date', render: o => formatDateTime(o.outward_date) },
-        { label: '', render: o => `<button class="btn btn-ghost btn-sm" onclick="regenPackingList('${o.customer_name}', '${o.invoice_number}')">PDF</button>` },
+        { label: '', render: o => `
+          <div style="display:flex;gap:4px;">
+            <button class="btn btn-ghost btn-sm" onclick="regenPackingList('${o.customer_name}', '${o.invoice_number}')">PDF</button>
+            <button class="btn btn-danger btn-sm" onclick="undoOutward(${o.id}, '${o.reel_number}')">Undo</button>
+          </div>
+        ` },
       ]
     });
 

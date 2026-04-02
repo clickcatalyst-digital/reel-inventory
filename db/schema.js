@@ -130,4 +130,21 @@ async function getNextBoxNumber() {
   return `BOX-${result.rows[0].value}`;
 }
 
-module.exports = { initDB, queryAll, queryOne, execute, getNextReelNumber, getNextBoxNumber };
+// Helper for adding new users
+async function createUser(username, password, role = 'user') {
+  const bcrypt = require('bcrypt');
+  const hash = await bcrypt.hash(password, 10);
+  await db.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+    [username, hash, role]);
+}
+
+function nowIST() {
+  // Returns current time as IST string for storage
+  const now = new Date();
+  // IST = UTC + 5:30
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const ist = new Date(now.getTime() + istOffset);
+  return ist.toISOString().replace('T', ' ').substring(0, 19);
+}
+
+module.exports = { initDB, queryAll, queryOne, execute, getNextReelNumber, getNextBoxNumber, createUser, nowIST };
