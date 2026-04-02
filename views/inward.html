@@ -11,6 +11,35 @@
   <nav class="nav">
     <a href="/" class="nav-brand">LS TECHNOLOGY INVENTORY MGT</a>
     <div class="nav-links">
+      <!-- Mobile cog menu -->
+      <div class="cog-menu" id="cogMenu">
+        <button class="cog-btn" onclick="toggleCogMenu()" title="Settings">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg>
+        </button>
+        <div class="cog-dropdown" id="cogDropdown">
+          <button onclick="toggleTheme(); toggleCogMenu()">
+            <svg viewBox="0 0 24 24" id="cogThemeIcon">
+              <circle cx="12" cy="12" r="5"/>
+              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+            <span id="cogThemeLabel">Dark Mode</span>
+          </button>
+          <a href="/api/logout" class="logout-link">
+            <svg viewBox="0 0 24 24">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+            Logout
+          </a>
+        </div>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">
+        <svg id="themeIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </button>
       <a href="/">Catalog</a>
       <a href="/inward">Inward</a>
       <a href="/outward">Outward</a>
@@ -76,6 +105,13 @@
 
     <!-- Recent Inwards -->
     <div class="card">
+      <div id="recentTable-container"></div>
+      <div style="margin-top:12px;">
+        <button class="btn btn-ghost btn-sm" onclick="reprintSelected()">Reprint Selected Labels</button>
+      </div>
+    </div>
+
+    <!-- <div class="card">
       <div class="card-title">Recent Inwards</div>
       <div class="table-wrap">
         <table>
@@ -103,7 +139,7 @@
           <button class="btn btn-ghost btn-sm" id="nextBtn" onclick="changePage(1)">Next →</button>
         </div>
       </div>
-    </div>
+    </div> -->
   </div>
 
   <script src="/public/js/app.js"></script>
@@ -239,42 +275,68 @@
       lastResult = null;
     }
 
-    let currentPage = 1;
-    const pageSize = 30;
+    // let currentPage = 1;
+    // const pageSize = 30;
 
-    async function loadRecent() {
-      try {
-        const offset = (currentPage - 1) * pageSize;
-        const reels = await api(`/api/inward/recent?limit=${pageSize}&offset=${offset}`);
-        const tbody = document.getElementById('recentTable');
-        if (!reels.length) {
-          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No inwards yet</td></tr>';
-          document.getElementById('nextBtn').disabled = true;
-          return;
-        }
-        tbody.innerHTML = reels.map(r => `
-          <tr>
-            <td><input type="checkbox" class="reel-check" value="${r.reel_number}"></td>
-            <td><strong>${r.reel_number}</strong></td>
-            <td>${r.box_number || '—'}</td>
-            <td>${r.item_code}</td>
-            <td>${formatQty(r.quantity)}</td>
-            <td>${statusBadge(r.status)}</td>
-            <td>${formatDateTime(r.inward_date)}</td>
-          </tr>
-        `).join('');
+    // async function loadRecent() {
+    //   try {
+    //     const offset = (currentPage - 1) * pageSize;
+    //     const reels = await api(`/api/inward/recent?limit=${pageSize}&offset=${offset}`);
+    //     const tbody = document.getElementById('recentTable');
+    //     if (!reels.length) {
+    //       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No inwards yet</td></tr>';
+    //       document.getElementById('nextBtn').disabled = true;
+    //       return;
+    //     }
+    //     tbody.innerHTML = reels.map(r => `
+    //       <tr>
+    //         <td><input type="checkbox" class="reel-check" value="${r.reel_number}"></td>
+    //         <td><strong>${r.reel_number}</strong></td>
+    //         <td>${r.box_number || '—'}</td>
+    //         <td>${r.item_code}</td>
+    //         <td>${formatQty(r.quantity)}</td>
+    //         <td>${statusBadge(r.status)}</td>
+    //         <td>${formatDateTime(r.inward_date)}</td>
+    //       </tr>
+    //     `).join('');
 
-        document.getElementById('prevBtn').disabled = currentPage === 1;
-        document.getElementById('nextBtn').disabled = reels.length < pageSize;
-        document.getElementById('pageInfo').textContent = `Page ${currentPage}`;
-        document.getElementById('selectAll').checked = false;
-      } catch (e) {}
-    }
+    //     document.getElementById('prevBtn').disabled = currentPage === 1;
+    //     document.getElementById('nextBtn').disabled = reels.length < pageSize;
+    //     document.getElementById('pageInfo').textContent = `Page ${currentPage}`;
+    //     document.getElementById('selectAll').checked = false;
+    //   } catch (e) {}
+    // }
 
-    function changePage(direction) {
+    // function changePage(direction) {
       currentPage += direction;
       if (currentPage < 1) currentPage = 1;
       loadRecent();
+    }
+
+    // function toggleSelectAll(el) {
+    //   document.querySelectorAll('.reel-check').forEach(cb => cb.checked = el.checked);
+    // }
+
+    const recentTablePT = new PaginatedTable({
+      containerId: 'recentTable-container',
+      pageSize: 10,
+      titleText: 'Recent Inwards',
+      columns: [
+        { label: '<input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">', render: r => `<input type="checkbox" class="reel-check" value="${r.reel_number}">` },
+        { label: 'Reel', render: r => `<strong>${r.reel_number}</strong>` },
+        { label: 'Box', render: r => r.box_number || '—' },
+        { label: 'Item', render: r => r.item_code },
+        { label: 'Qty', render: r => formatQty(r.quantity) },
+        { label: 'Status', render: r => statusBadge(r.status) },
+        { label: 'Date & Time', render: r => formatDateTime(r.inward_date) },
+      ]
+    });
+
+    async function loadRecent() {
+      try {
+        const reels = await api(`/api/inward/recent?limit=500`);
+        recentTablePT.load(reels);
+      } catch (e) {}
     }
 
     function toggleSelectAll(el) {

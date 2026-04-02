@@ -13,6 +13,35 @@
   <nav class="nav">
     <a href="/" class="nav-brand">LS TECHNOLOGY INVENTORY MGT</a>
     <div class="nav-links">
+      <!-- Mobile cog menu -->
+      <div class="cog-menu" id="cogMenu">
+        <button class="cog-btn" onclick="toggleCogMenu()" title="Settings">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg>
+        </button>
+        <div class="cog-dropdown" id="cogDropdown">
+          <button onclick="toggleTheme(); toggleCogMenu()">
+            <svg viewBox="0 0 24 24" id="cogThemeIcon">
+              <circle cx="12" cy="12" r="5"/>
+              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+            <span id="cogThemeLabel">Dark Mode</span>
+          </button>
+          <a href="/api/logout" class="logout-link">
+            <svg viewBox="0 0 24 24">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+            Logout
+          </a>
+        </div>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">
+        <svg id="themeIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </button>
       <a href="/">Catalog</a>
       <a href="/inward">Inward</a>
       <a href="/outward">Outward</a>
@@ -29,7 +58,7 @@
 
     <!-- STOCK SUMMARY -->
     <div class="card" id="summaryCard">
-      <div class="card-title">Stock Summary</div>
+      <!-- <div class="card-title">Stock Summary</div> -->
       <div class="stats-grid" id="statsGrid">
         <div class="stat-box">
           <div class="stat-value" id="totalItems">-</div>
@@ -50,7 +79,9 @@
       </div>
 
       <!-- Stock by item table -->
-      <div class="table-wrap">
+      <div id="summaryTable-container"></div>
+
+      <!-- <div class="table-wrap">
         <table>
           <thead>
             <tr>
@@ -66,7 +97,7 @@
           </tbody>
         </table>
       </div>
-    </div>
+    </div> -->
 
     <!-- ITEM TREND POPUP -->
     <div class="card" id="itemTrendCard" style="display:none;">
@@ -177,6 +208,9 @@
     <!-- ALERTS -->
     <div class="analytics-grid" id="alertsGrid" style="display:none;">
       <div class="card" id="deadStockCard" style="border-left: 3px solid var(--danger);">
+        <div id="deadStockTable-container"></div>
+      </div>
+      <!-- <div class="card" id="deadStockCard" style="border-left: 3px solid var(--danger);">
         <div class="card-title" style="color:var(--danger);">⚠️ Dead Stock — No Movement 30+ Days</div>
         <div class="table-wrap">
           <table>
@@ -184,8 +218,13 @@
             <tbody id="deadStockTable"></tbody>
           </table>
         </div>
-      </div>
+      </div> -->
+
       <div class="card" id="lowStockCard" style="border-left: 3px solid var(--warning);">
+        <div id="lowStockTable-container"></div>
+      </div>
+
+      <!-- <div class="card" id="lowStockCard" style="border-left: 3px solid var(--warning);">
         <div class="card-title" style="color:var(--warning);">⚠️ Low Stock — Below 5 Reels</div>
         <div class="table-wrap">
           <table>
@@ -193,7 +232,7 @@
             <tbody id="lowStockTable"></tbody>
           </table>
         </div>
-      </div>
+      </div> -->
     </div>
 
     <!-- ANALYTICS -->
@@ -219,7 +258,7 @@
       </div>
     </div>
 
-    <div class="analytics-grid">
+    <!-- <div class="analytics-grid">
       <div class="card">
         <div class="card-title">Stock Aging — Oldest In-Stock Reels</div>
         <div class="table-wrap">
@@ -242,6 +281,15 @@
           </table>
         </div>
       </div>
+    </div> -->
+
+    <div class="analytics-grid">
+      <div class="card">
+        <div id="agingTable-container"></div>
+      </div>
+      <div class="card">
+        <div id="customersTable-container"></div>
+      </div>
     </div>
 
     <!-- HOW ANALYTICS WORK -->
@@ -262,40 +310,127 @@
     </div>
 
   <script src="/public/js/app.js"></script>
+  
   <script>
+    // Instantiate all paginated tables once on load
+    const tables = {
+      summary: new PaginatedTable({
+        containerId: 'summaryTable-container',
+        pageSize: 5,
+        titleText: 'Stock by Item',
+        columns: [
+          { label: 'Item Code', render: s => `<strong style="cursor:pointer;color:var(--primary);" onclick="showItemTrend('${s.item_code}')">${s.item_code}</strong>` },
+          { label: 'Description', render: s => s.description },
+          { label: 'SPQ', render: s => formatQty(s.default_spq) },
+          { label: 'In Stock Reels', render: s => s.in_stock_reels || 0 },
+          { label: 'Total Qty', render: s => formatQty(s.total_quantity || 0) },
+        ]
+      }),
+      aging: new PaginatedTable({
+        containerId: 'agingTable-container',
+        pageSize: 5,
+        titleText: 'Stock Aging — Oldest In-Stock Reels',
+        columns: [
+          { label: 'Reel', render: r => `<strong>${r.reel_number}</strong>` },
+          { label: 'Item', render: r => r.item_code },
+          { label: 'Days in Stock', render: r => {
+            const color = r.days_in_stock > 30 ? 'var(--danger)' : r.days_in_stock > 14 ? 'var(--warning)' : 'var(--success)';
+            return `<span style="color:${color};font-weight:700;">${r.days_in_stock} days</span>`;
+          }},
+        ]
+      }),
+      customers: new PaginatedTable({
+        containerId: 'customersTable-container',
+        pageSize: 5,
+        titleText: 'Top Customers',
+        columns: [
+          { label: 'Customer', render: c => `<strong>${c.customer_name}</strong>` },
+          { label: 'Reels', render: c => c.reel_count },
+          { label: 'Quantity', render: c => formatQty(c.total_quantity) },
+          { label: 'Invoices', render: c => c.invoice_count },
+        ]
+      }),
+      deadStock: new PaginatedTable({
+        containerId: 'deadStockTable-container',
+        pageSize: 5,
+        titleText: '⚠️ Dead Stock — No Movement 30+ Days',
+        columns: [
+          { label: 'Item', render: d => `<strong>${d.item_code}</strong>` },
+          { label: 'Description', render: d => d.description },
+          { label: 'In Stock', render: d => d.in_stock_reels },
+          { label: 'Qty', render: d => formatQty(d.total_quantity) },
+          { label: 'Last Outward', render: d => `<span style="color:var(--danger);font-weight:700;">${d.last_outward_date ? formatDate(d.last_outward_date) + ' (' + d.days_since_last_outward + 'd ago)' : 'Never sold'}</span>` },
+        ]
+      }),
+      lowStock: new PaginatedTable({
+        containerId: 'lowStockTable-container',
+        pageSize: 5,
+        titleText: '⚠️ Low Stock — Below 5 Reels',
+        columns: [
+          { label: 'Item', render: l => `<strong>${l.item_code}</strong>` },
+          { label: 'Description', render: l => l.description },
+          { label: 'Reels', render: l => {
+            const color = l.in_stock_reels === 0 ? 'var(--danger)' : l.in_stock_reels <= 2 ? 'var(--warning)' : 'var(--text)';
+            return `<span style="color:${color};font-weight:700;">${l.in_stock_reels || 0} reels</span>`;
+          }},
+          { label: 'Qty', render: l => formatQty(l.total_quantity || 0) },
+        ]
+      }),
+    };
+
     document.addEventListener('DOMContentLoaded', loadSummary);
+
+    // async function loadSummary() {
+    //   try {
+    //     const summary = await api('/api/dashboard/stock-summary');
+    //     summary.sort((a, b) => a.item_code.localeCompare(b.item_code));
+    //     let totalReels = 0, inStock = 0, totalQty = 0;
+
+    //     const tbody = document.getElementById('summaryTable');
+    //     if (!summary.length) {
+    //       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No data yet</td></tr>';
+    //       return;
+    //     }
+
+    //     tbody.innerHTML = summary.map(s => {
+    //       totalReels += s.total_reels || 0;
+    //       inStock += s.in_stock_reels || 0;
+    //       totalQty += s.total_quantity || 0;
+    //       return `
+    //         <tr style="cursor:pointer;" onclick="showItemTrend('${s.item_code}')">
+    //           <td><strong>${s.item_code}</strong></td>
+    //           <td>${s.description}</td>
+    //           <td>${formatQty(s.default_spq)}</td>
+    //           <td>${s.in_stock_reels || 0}</td>
+    //           <td>${formatQty(s.total_quantity || 0)}</td>
+    //         </tr>
+    //       `;
+    //     }).join('');
+
+    //     document.getElementById('totalItems').textContent = summary.length;
+    //     document.getElementById('totalReels').textContent = totalReels;
+    //     document.getElementById('inStockReels').textContent = inStock;
+    //     document.getElementById('outwardedReels').textContent = totalReels - inStock;
+    //   } catch (e) {}
+    // }
 
     async function loadSummary() {
       try {
         const summary = await api('/api/dashboard/stock-summary');
         summary.sort((a, b) => a.item_code.localeCompare(b.item_code));
-        let totalReels = 0, inStock = 0, totalQty = 0;
+        let totalReels = 0, inStock = 0;
 
-        const tbody = document.getElementById('summaryTable');
-        if (!summary.length) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No data yet</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = summary.map(s => {
+        summary.forEach(s => {
           totalReels += s.total_reels || 0;
           inStock += s.in_stock_reels || 0;
-          totalQty += s.total_quantity || 0;
-          return `
-            <tr style="cursor:pointer;" onclick="showItemTrend('${s.item_code}')">
-              <td><strong>${s.item_code}</strong></td>
-              <td>${s.description}</td>
-              <td>${formatQty(s.default_spq)}</td>
-              <td>${s.in_stock_reels || 0}</td>
-              <td>${formatQty(s.total_quantity || 0)}</td>
-            </tr>
-          `;
-        }).join('');
+        });
 
         document.getElementById('totalItems').textContent = summary.length;
         document.getElementById('totalReels').textContent = totalReels;
         document.getElementById('inStockReels').textContent = inStock;
         document.getElementById('outwardedReels').textContent = totalReels - inStock;
+
+        tables.summary.load(summary);
       } catch (e) {}
     }
 
@@ -441,19 +576,22 @@
         }
 
         // 2. Aging - in stock table
-        const agingTbody = document.getElementById('agingTable');
-        if (data.agingInStock.length) {
-          agingTbody.innerHTML = data.agingInStock.map(r => {
-            const color = r.days_in_stock > 30 ? 'var(--danger)' : r.days_in_stock > 14 ? 'var(--warning)' : 'var(--success)';
-            return `<tr>
-              <td><strong>${r.reel_number}</strong></td>
-              <td>${r.item_code}</td>
-              <td style="color:${color};font-weight:700;">${r.days_in_stock} days</td>
-            </tr>`;
-          }).join('');
-        } else {
-          agingTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted)">No in-stock reels</td></tr>';
-        }
+        tables.aging.load(data.agingInStock);
+
+        // 2. Aging - in stock table
+        // const agingTbody = document.getElementById('agingTable');
+        // if (data.agingInStock.length) {
+        //   agingTbody.innerHTML = data.agingInStock.map(r => {
+        //     const color = r.days_in_stock > 30 ? 'var(--danger)' : r.days_in_stock > 14 ? 'var(--warning)' : 'var(--success)';
+        //     return `<tr>
+        //       <td><strong>${r.reel_number}</strong></td>
+        //       <td>${r.item_code}</td>
+        //       <td style="color:${color};font-weight:700;">${r.days_in_stock} days</td>
+        //     </tr>`;
+        //   }).join('');
+        // } else {
+        //   agingTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted)">No in-stock reels</td></tr>';
+        // }
 
         // Aging - avg days to ship chart
         if (data.agingOutwarded.length) {
@@ -498,19 +636,22 @@
         }
 
         // 4. Top customers table
-        const custTbody = document.getElementById('customersTable');
-        if (data.topCustomers.length) {
-          custTbody.innerHTML = data.topCustomers.map(c => `
-            <tr>
-              <td><strong>${c.customer_name}</strong></td>
-              <td>${c.reel_count}</td>
-              <td>${formatQty(c.total_quantity)}</td>
-              <td>${c.invoice_count}</td>
-            </tr>
-          `).join('');
-        } else {
-          custTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No outwards yet</td></tr>';
-        }
+        tables.customers.load(data.topCustomers);
+
+        // 4. Top customers table
+        // const custTbody = document.getElementById('customersTable');
+        // if (data.topCustomers.length) {
+        //   custTbody.innerHTML = data.topCustomers.map(c => `
+        //     <tr>
+        //       <td><strong>${c.customer_name}</strong></td>
+        //       <td>${c.reel_count}</td>
+        //       <td>${formatQty(c.total_quantity)}</td>
+        //       <td>${c.invoice_count}</td>
+        //     </tr>
+        //   `).join('');
+        // } else {
+        //   custTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No outwards yet</td></tr>';
+        // }
 
         // 5. Inventory over time
         if (data.inventoryTimeline.length) {
@@ -537,42 +678,46 @@
         }
 
         // 6. Dead stock alerts
-        const deadTbody = document.getElementById('deadStockTable');
-        const lowTbody = document.getElementById('lowStockTable');
+        // const deadTbody = document.getElementById('deadStockTable');
+        // const lowTbody = document.getElementById('lowStockTable');
         const alertsGrid = document.getElementById('alertsGrid');
 
         alertsGrid.style.display = 'grid';
 
-        if (data.deadStock.length) {
-          deadTbody.innerHTML = data.deadStock.map(d => `
-            <tr>
-              <td><strong>${d.item_code}</strong></td>
-              <td>${d.description}</td>
-              <td>${d.in_stock_reels}</td>
-              <td>${formatQty(d.total_quantity)}</td>
-              <td style="color:var(--danger); font-weight:700;">${d.last_outward_date ? formatDate(d.last_outward_date) + ' (' + d.days_since_last_outward + 'd ago)' : 'Never sold'}</td>
-            </tr>
-          `).join('');
-        } else {
-          deadTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--success); font-weight:700;">✅ All items moving — no dead stock</td></tr>';
-        }
+        tables.deadStock.load(data.deadStock);
+
+        // if (data.deadStock.length) {
+        //   deadTbody.innerHTML = data.deadStock.map(d => `
+        //     <tr>
+        //       <td><strong>${d.item_code}</strong></td>
+        //       <td>${d.description}</td>
+        //       <td>${d.in_stock_reels}</td>
+        //       <td>${formatQty(d.total_quantity)}</td>
+        //       <td style="color:var(--danger); font-weight:700;">${d.last_outward_date ? formatDate(d.last_outward_date) + ' (' + d.days_since_last_outward + 'd ago)' : 'Never sold'}</td>
+        //     </tr>
+        //   `).join('');
+        // } else {
+        //   deadTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--success); font-weight:700;">✅ All items moving — no dead stock</td></tr>';
+        // }
 
         // 7. Low stock alerts
-        if (data.lowStock.length) {
-          lowTbody.innerHTML = data.lowStock.map(l => {
-            const color = l.in_stock_reels === 0 ? 'var(--danger)' : l.in_stock_reels <= 2 ? 'var(--warning)' : 'var(--text)';
-            return `
-              <tr>
-                <td><strong>${l.item_code}</strong></td>
-                <td>${l.description}</td>
-                <td style="color:${color}; font-weight:700;">${l.in_stock_reels || 0} reels</td>
-                <td>${formatQty(l.total_quantity || 0)}</td>
-              </tr>
-            `;
-          }).join('');
-        } else {
-          lowTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--success); font-weight:700;">✅ All items above minimum stock</td></tr>';
-        }
+        tables.lowStock.load(data.lowStock);
+
+        // if (data.lowStock.length) {
+        //   lowTbody.innerHTML = data.lowStock.map(l => {
+        //     const color = l.in_stock_reels === 0 ? 'var(--danger)' : l.in_stock_reels <= 2 ? 'var(--warning)' : 'var(--text)';
+        //     return `
+        //       <tr>
+        //         <td><strong>${l.item_code}</strong></td>
+        //         <td>${l.description}</td>
+        //         <td style="color:${color}; font-weight:700;">${l.in_stock_reels || 0} reels</td>
+        //         <td>${formatQty(l.total_quantity || 0)}</td>
+        //       </tr>
+        //     `;
+        //   }).join('');
+        // } else {
+        //   lowTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--success); font-weight:700;">✅ All items above minimum stock</td></tr>';
+        // }
 
       } catch (e) {
         console.error('Analytics failed:', e);
