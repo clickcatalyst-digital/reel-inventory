@@ -5,11 +5,16 @@ const cookieParser = require('cookie-parser');
 const bcrypt = require('bcrypt');
 const path = require('path');
 const os = require('os');
+const morgan = require('morgan'); // for logs
 const { initDB, queryOne } = require('./db/schema');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret';
+
+// 2. Add Morgan logging middleware
+// 'dev' prints concise, color-coded logs for development and debugging
+app.use(morgan('dev'));
 
 app.use(cookieParser());
 app.use(express.json());

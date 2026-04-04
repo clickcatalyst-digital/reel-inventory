@@ -170,10 +170,20 @@
       } catch (e) {}
     }
 
+    // async function deleteItem(itemCode) {
+    //   if (!confirm(`Delete ${itemCode}? This cannot be undone.`)) return;
+    //   try {
+    //     await api(`/api/items/${itemCode}`, { method: 'DELETE' });
+    //     showToast(`${itemCode} deleted`);
+    //     loadItems();
+    //   } catch (e) {}
+    // }
+
     async function deleteItem(itemCode) {
       if (!confirm(`Delete ${itemCode}? This cannot be undone.`)) return;
       try {
-        await api(`/api/items/${itemCode}`, { method: 'DELETE' });
+        // encodeURIComponent converts the slash into %2F so Express treats it as text!
+        await api(`/api/items/${encodeURIComponent(itemCode)}`, { method: 'DELETE' }); 
         showToast(`${itemCode} deleted`);
         loadItems();
       } catch (e) {}
