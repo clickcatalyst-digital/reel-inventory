@@ -152,9 +152,10 @@
         const reels = p.reel_numbers || (p.reel_number ? [p.reel_number] : []);
         payloadHtml = `
           <div class="request-payload">
+            <strong>Item:</strong> ${p.item_code || '—'} &nbsp;|&nbsp;
             <strong>Customer:</strong> ${p.customer_name} &nbsp;|&nbsp;
             <strong>Invoice:</strong> ${p.invoice_number} &nbsp;|&nbsp;
-            <strong>Reels (${reels.length}):</strong> ${reels.join(', ')} &nbsp;|&nbsp;
+            <strong>Reels (${reels.length}):</strong> ${reels.map(r => r.replace('REEL-', '')).join(', ')} &nbsp;|&nbsp;
             <strong>Notes:</strong> ${p.notes || '—'}
           </div>`;
       }
@@ -190,24 +191,34 @@
         const reels = p.reel_numbers || (p.reel_number ? [p.reel_number] : []);
         editFieldsHtml = `
           <div class="edit-fields" id="edit-${r.id}">
-            <div class="form-group">
-              <label>Customer</label>
-              <input type="text" class="form-control" id="edit-customer-${r.id}" value="${p.customer_name}">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Customer</label>
+                <input type="text" class="form-control" id="edit-customer-${r.id}" value="${p.customer_name}">
+              </div>
+              <div class="form-group">
+                <label>Invoice</label>
+                <input type="text" class="form-control" id="edit-invoice-${r.id}" value="${p.invoice_number}">
+              </div>
             </div>
             <div class="form-group">
-              <label>Invoice</label>
-              <input type="text" class="form-control" id="edit-invoice-${r.id}" value="${p.invoice_number}">
-            </div>
-            <div class="form-group">
-              <label>Reel Numbers (comma separated)</label>
-              <input type="text" class="form-control" id="edit-reelnums-${r.id}" value="${reels.join(', ')}">
+              <label>Reels — uncheck to remove from this approval</label>
+              <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;">
+                ${reels.map(rn => `
+                  <label style="display:flex; align-items:center; gap:5px; font-size:12px; font-weight:400; cursor:pointer;">
+                    <input type="checkbox" class="edit-reel-check-${r.id}" value="${rn}" checked
+                      style="accent-color:var(--primary);">
+                    ${rn.replace('REEL-', '')}
+                  </label>
+                `).join('')}
+              </div>
             </div>
             <div class="form-group">
               <label>Notes</label>
               <input type="text" class="form-control" id="edit-notes-${r.id}" value="${p.notes || ''}">
             </div>
             <div class="btn-row" style="margin-top:8px;">
-              <button class="btn btn-success btn-sm" onclick="editApprove(${r.id}, 'outward')">Approve Edited</button>
+              <button class="btn btn-success btn-sm" onclick="editApprove(${r.id}, 'outward')">Approve Selected</button>
               <button class="btn btn-ghost btn-sm" onclick="toggleEdit(${r.id})">Cancel</button>
             </div>
           </div>`;
@@ -280,19 +291,21 @@
           return showToast('Item code and reels are required', 'error');
         }
       } else {
-        const reelRaw = document.getElementById(`edit-reelnums-${id}`).value;
-        const reelNumbers = reelRaw.split(',').map(s => s.trim()).filter(Boolean).map(s =>
-          s.startsWith('REEL-') ? s : `REEL-${s}`
-        );
+        const checked = [...document.querySelectorAll(`.edit-reel-check-${id}:checked`)];
+        const reelNumbers = checked.map(cb => cb.value.startsWith('REEL-') ? cb.value : `REEL-${cb.value}`);
+        if (!reelNumbers.length) {
+          return showToast('Select at least one reel to approve', 'error');
+        }
         payload = {
+          item_code: checked[0]?.closest('[data-item]')?.dataset.item || undefined,
           customer_name: document.getElementById(`edit-customer-${id}`).value.trim(),
           invoice_number: document.getElementById(`edit-invoice-${id}`).value.trim(),
           reel_numbers: reelNumbers,
           outward_type: 'Full',
           notes: document.getElementById(`edit-notes-${id}`).value.trim() || null
         };
-        if (!payload.customer_name || !payload.invoice_number || !reelNumbers.length) {
-          return showToast('Customer, invoice, and at least one reel required', 'error');
+        if (!payload.customer_name || !payload.invoice_number) {
+          return showToast('Customer and invoice are required', 'error');
         }
       }
 

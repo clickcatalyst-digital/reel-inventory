@@ -258,4 +258,69 @@ router.post('/undo', async (req, res) => {
   }
 });
 
+router.post('/grouped', async (req, res) => {
+  const { item_code, reel_numbers, customer_name, invoice_number, outward_type, notes } = req.body;
+
+  if (!item_code || !reel_numbers?.length || !customer_name || !invoice_number) {
+    return res.status(400).json({ error: 'item_code, reel_numbers, customer_name, and invoice_number are required' });
+  }
+
+  if (req.user?.role === 'client') {
+    return res.status(403).json({ error: 'Not authorized' });
+  }
+
+  const userRole = req.user?.role;
+  const username = req.user?.username;
+
+  // Validate all reels exist and are in stock
+  for (const reel_number of reel_numbers) {
+    const reel = await queryOne('SELECT * FROM reels WHERE reel_number = ?', [reel_number]);
+    if (!reel) return res.status(404).json({ error: `Reel ${reel_number} not found` });
+    if (reel.status === 'Outwarded') return res.status(400).json({ error: `Reel ${reel_number} already outwarded` });
+  }
+
+  if (APPROVER_ROLES.includes(userRole)) {
+    const errors = [];
+    for (const reel_number of reel_numbers) {
+      try {
+        await executeOutwardReel(reel_number, customer_name, invoice_number, outward_type || 'Full', null, notes);
+      } catch (err) {
+        errors.push(`${reel_number}: ${err.message}`);
+      }
+    }
+    if (errors.length > 0 && errors.length === reel_numbers.length) {
+      return res.status(400).json({ error: 'All reels failed', details: errors });
+    }
+    return res.json({
+      success: true,
+      approved: true,
+      message: `${reel_numbers.length - errors.length} reel(s) outwarded for ${item_code}`
+    });
+  }
+
+  // Staff: save as single grouped pending request
+  try {
+    const payload = JSON.stringify({
+      item_code,
+      reel_numbers,
+      customer_name,
+      invoice_number,
+      outward_type: outward_type || 'Full',
+      notes: notes || null
+    });
+    await execute(
+      'INSERT INTO requests (type, status, created_by, created_at, payload) VALUES (?, ?, ?, ?, ?)',
+      ['outward', 'pending', username, nowIST(), payload]
+    );
+    return res.json({
+      success: true,
+      approved: false,
+      pending: true,
+      message: `Outward request submitted for ${item_code} (${reel_numbers.length} reels)`
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
