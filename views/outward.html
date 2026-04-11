@@ -262,7 +262,7 @@
       }
 
       const reel = await api(`/api/outward/reel/${reelNumber}`);
-      cart.push({
+      cart.unshift({
         reel_number: reel.reel_number,
         item_code: reel.item_code,
         description: reel.description,
@@ -287,7 +287,7 @@
         }
         if (cart.find(r => r.reel_number === reel.reel_number)) continue; // already in cart
 
-        cart.push({
+        cart.unshift({
           reel_number: reel.reel_number,
           item_code: reel.item_code,
           description: reel.description,
@@ -319,6 +319,17 @@
       countEl.textContent = cart.length;
       btn.textContent = `Outward ${cart.length} Reel(s)`;
       btn.disabled = cart.length === 0;
+
+      // Summary line
+      const totalPcs = cart.reduce((s, r) => s + (r.quantity || 0), 0);
+      const uniqueItems = new Set(cart.map(r => r.item_code)).size;
+      const existingSummary = document.getElementById('cartSummaryLine');
+      if (existingSummary) existingSummary.remove();
+      const summaryLine = document.createElement('div');
+      summaryLine.id = 'cartSummaryLine';
+      summaryLine.style.cssText = 'font-size:12px; color:var(--text-muted); padding:6px 2px 10px; border-bottom:1px solid var(--border); margin-bottom:10px;';
+      summaryLine.innerHTML = `<strong>${cart.length}</strong> reel(s) &nbsp;·&nbsp; <strong>${uniqueItems}</strong> item(s) &nbsp;·&nbsp; <strong>${formatQty(totalPcs)}</strong> pcs total`;
+      list.before(summaryLine);
 
       list.innerHTML = cart.map((r, i) => `
         <div class="cart-item">

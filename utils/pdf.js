@@ -10,8 +10,8 @@ const mm = (v) => v * 2.83465;
 const LABEL_W = mm(85);
 const LABEL_H = mm(24);
 const HALF_W = LABEL_W / 2;
-const QR_SIZE = mm(18);   // Slightly smaller to allow top/bottom breathing room
-const PAD = mm(2);        // Increased padding for better top/bottom margins
+const QR_SIZE = mm(21);   // Slightly smaller to allow top/bottom breathing room
+const PAD = mm(1.5);        // Increased padding for better top/bottom margins
 
 router.post('/generate', async (req, res) => {
   const { reel_numbers } = req.body;
@@ -65,23 +65,19 @@ router.post('/generate', async (req, res) => {
       // Text area - starts aligned with top of QR
       const textX = xOffset + PAD + QR_SIZE + mm(2);
       const textW = HALF_W - QR_SIZE - PAD * 2 - mm(2);
-      const textTopY = qrY + mm(0.7); // align first line with QR top edge
+      // Distribute 4 lines evenly across QR height
+      // Fixed positions relative to qrY — tuned visually for 20mm QR on 24mm label
+      doc.fontSize(11).font('Helvetica-Bold').fillColor('#000000');
+      doc.text(reel.reel_number.replace('REEL-', ''), textX, qrY + mm(1), { width: textW, lineBreak: false });
 
-      // Reel number - big and bold (just the number)
-      doc.fontSize(9).font('Helvetica-Bold').fillColor('#000000');
-      doc.text(reel.reel_number.replace('REEL-', ''), textX, textTopY, { width: textW, lineBreak: false });
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#222222');
+      doc.text(reel.item_code, textX, qrY + mm(5.5), { width: textW, lineBreak: false });
 
-      // Item code
-      doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#222222');
-      doc.text(reel.item_code, textX, textTopY + mm(4.5), { width: textW, lineBreak: false });
+      doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#333333');
+      doc.text(`Qty: ${reel.quantity.toLocaleString()}`, textX, qrY + mm(10), { width: textW, lineBreak: false });
 
-      // Quantity
-      doc.fontSize(7).font('Helvetica-Bold').fillColor('#333333');
-      doc.text(`Qty: ${reel.quantity.toLocaleString()}`, textX, textTopY + mm(9), { width: textW, lineBreak: false });
-
-      // Date + Time
-      doc.fontSize(7).font('Helvetica-Bold').fillColor('#555555');
-      doc.text(`${dateStr}  ${timeStr}`, textX, textTopY + mm(13), { width: textW, lineBreak: false });
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#555555');
+      doc.text(dateStr, textX, qrY + mm(17.5), { width: textW, lineBreak: false });
     }
 
     // Center divider
@@ -167,7 +163,7 @@ router.post('/packing-list', async (req, res) => {
   // A4 landscape dimensions
   const PAGE_W = 841.89;
   const PAGE_H = 595.28;
-  const MARGIN = 40;
+  const MARGIN = 35;
   const CONTENT_W = PAGE_W - MARGIN * 2;
 
   const doc = new PDFDocument({
@@ -215,33 +211,34 @@ router.post('/packing-list', async (req, res) => {
 
   // --- Column layout (landscape) ---
   // Sr | Item | Description | SPQ | Reel Qty | Total Item Qty | Reel Numbers
-  const col = {
-    sn:          MARGIN,
-    item:        MARGIN + 30,
-    desc:        MARGIN + 110,
-    spq:         MARGIN + 260,
-    reelQty:     MARGIN + 320,
-    totalQty:    MARGIN + 400,
-    reelNums:    MARGIN + 490,
-  };
+  // Define widths first, positions calculated from them
   const COL_WIDTHS = {
-    sn: 28,
-    item: 78,
-    desc: 148,
-    spq: 58,
-    reelQty: 78,
-    totalQty: 88,
-    reelNums: CONTENT_W - 490, // remaining width
+    sn:       30,
+    item:     110,
+    desc:     200,
+    spq:      55,
+    reelQty:  80,
+    totalQty: 85,
+    reelNums: CONTENT_W - 30 - 110 - 200 - 55 - 80 - 85,
+  };
+  const col = {
+    sn:       MARGIN,
+    item:     MARGIN + COL_WIDTHS.sn,
+    desc:     MARGIN + COL_WIDTHS.sn + COL_WIDTHS.item,
+    spq:      MARGIN + COL_WIDTHS.sn + COL_WIDTHS.item + COL_WIDTHS.desc,
+    reelQty:  MARGIN + COL_WIDTHS.sn + COL_WIDTHS.item + COL_WIDTHS.desc + COL_WIDTHS.spq,
+    totalQty: MARGIN + COL_WIDTHS.sn + COL_WIDTHS.item + COL_WIDTHS.desc + COL_WIDTHS.spq + COL_WIDTHS.reelQty,
+    reelNums: MARGIN + COL_WIDTHS.sn + COL_WIDTHS.item + COL_WIDTHS.desc + COL_WIDTHS.spq + COL_WIDTHS.reelQty + COL_WIDTHS.totalQty,
   };
 
   function drawTableHeader(doc, y) {
     doc.rect(MARGIN, y, CONTENT_W, 20).fill('#1a1a18');
     doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#ffffff');
-    doc.text('#',              col.sn,       y + 6, { width: COL_WIDTHS.sn,       lineBreak: false });
+    doc.text('#', col.sn + 10, y + 6, { width: COL_WIDTHS.sn, lineBreak: false });
     doc.text('ITEM CODE',     col.item,     y + 6, { width: COL_WIDTHS.item,     lineBreak: false });
     doc.text('DESCRIPTION',   col.desc,     y + 6, { width: COL_WIDTHS.desc,     lineBreak: false });
     doc.text('SPQ',           col.spq,      y + 6, { width: COL_WIDTHS.spq,      lineBreak: false });
-    doc.text('REEL QTY',      col.reelQty,  y + 6, { width: COL_WIDTHS.reelQty,  lineBreak: false });
+    doc.text('NO. OF REELS',  col.reelQty,  y + 6, { width: COL_WIDTHS.reelQty,  lineBreak: false });
     doc.text('TOTAL QTY',     col.totalQty, y + 6, { width: COL_WIDTHS.totalQty, lineBreak: false });
     doc.text('REEL NUMBERS',  col.reelNums, y + 6, { width: COL_WIDTHS.reelNums, lineBreak: false });
     return y + 22;
@@ -284,11 +281,8 @@ router.post('/packing-list', async (req, res) => {
     const totalItemQty = reelQtys.reduce((s, q) => s + (q || 0), 0);
     const reelNumbers = row.reels.map(r => r.reel_number.replace('REEL-', '')).join(', ');
 
-    // Determine reel qty display
-    const uniqueQtys = [...new Set(reelQtys)];
-    const reelQtyDisplay = uniqueQtys.length === 1
-      ? uniqueQtys[0].toLocaleString()
-      : 'Mixed';
+    // Reel Qty = number of reels for this item
+    const reelQtyDisplay = row.reels.length.toString();
 
     grandTotalQty += totalItemQty;
     grandTotalReels += row.reels.length;
@@ -312,7 +306,7 @@ router.post('/packing-list', async (req, res) => {
 
     doc.fontSize(8).fillColor('#333333');
 
-    doc.font('Helvetica').text(String(i + 1),          col.sn,       y + 6, { width: COL_WIDTHS.sn,       lineBreak: false });
+    doc.font('Helvetica').text(String(i + 1), col.sn + 10, y + 6, { width: COL_WIDTHS.sn, lineBreak: false });
     doc.font('Helvetica-Bold').text(row.item_code,     col.item,     y + 6, { width: COL_WIDTHS.item,     lineBreak: false });
     doc.font('Helvetica').text(row.description,        col.desc,     y + 6, { width: COL_WIDTHS.desc,     lineBreak: false });
     doc.text(String(row.spq),                          col.spq,      y + 6, { width: COL_WIDTHS.spq,      lineBreak: false });
