@@ -82,10 +82,9 @@
         // Table
         const tbody = document.getElementById('stockTable');
         if (!inStock.length) {
-          tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No stock currently</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No stock currently</td></tr>';
         } else {
           tbody.innerHTML = inStock
-            .sort((a, b) => (b.total_quantity || 0) - (a.total_quantity || 0))
             .map(s => `
               <tr>
                 <td><strong>${s.item_code}</strong></td>
@@ -95,25 +94,6 @@
               </tr>
             `).join('');
         }
-
-        // Chart 1: Bar — stock qty per item
-        new Chart(document.getElementById('stockBarChart'), {
-          type: 'bar',
-          data: {
-            labels: inStock.map(s => s.item_code),
-            datasets: [{
-              label: 'Quantity In Stock',
-              data: inStock.map(s => s.total_quantity || 0),
-              backgroundColor: '#2563eb'
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } }
-          }
-        });
 
       } catch (e) {}
     }
