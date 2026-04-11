@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Stock View | LS Technology</title>
   <link rel="stylesheet" href="/public/css/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -62,24 +61,6 @@
         </table>
       </div>
     </div>
-
-    <!-- Chart 1: Current stock qty per item -->
-    <div class="card">
-      <div class="card-title">Stock Quantity by Item</div>
-      <div class="chart-container"><canvas id="stockBarChart"></canvas></div>
-    </div>
-
-    <!-- Chart 2: Monthly stock trend -->
-    <div class="card">
-      <div class="card-title">Monthly Stock Trend — Last 12 Months</div>
-      <div class="chart-container"><canvas id="trendLineChart"></canvas></div>
-    </div>
-
-    <!-- Chart 3: Top moving items -->
-    <div class="card">
-      <div class="card-title">Fastest Moving Items — Last 90 Days</div>
-      <div class="chart-container"><canvas id="velocityChart"></canvas></div>
-    </div>
   </div>
 
   <script src="/public/js/app.js"></script>
@@ -133,60 +114,7 @@
       } catch (e) {}
     }
 
-    async function loadTrends() {
-      try {
-        const data = await api('/api/dashboard/analytics');
-
-        // Chart 2: Line — inventory over time
-        if (data.inventoryTimeline.length) {
-          new Chart(document.getElementById('trendLineChart'), {
-            type: 'line',
-            data: {
-              labels: data.inventoryTimeline.map(m => m.month),
-              datasets: [{
-                label: 'Stock Level',
-                data: data.inventoryTimeline.map(m => m.quantity),
-                borderColor: '#16a34a',
-                backgroundColor: 'rgba(22,163,74,0.1)',
-                fill: true,
-                tension: 0.3
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: { y: { beginAtZero: true } }
-            }
-          });
-        }
-
-        // Chart 3: Bar — velocity (top moving items)
-        if (data.velocity.length) {
-          new Chart(document.getElementById('velocityChart'), {
-            type: 'bar',
-            data: {
-              labels: data.velocity.map(v => v.item_code),
-              datasets: [{
-                label: 'Qty Shipped',
-                data: data.velocity.map(v => v.total_shipped),
-                backgroundColor: '#d97706'
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: { y: { beginAtZero: true } }
-            }
-          });
-        }
-
-      } catch (e) {}
-    }
-
     loadStock();
-    loadTrends();
   </script>
 </body>
 </html>
