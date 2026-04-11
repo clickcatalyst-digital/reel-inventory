@@ -69,7 +69,9 @@
     async function loadStock() {
       try {
         const summary = await api('/api/dashboard/stock-summary');
-        const inStock = summary.filter(s => (s.in_stock_reels || 0) > 0);
+        const inStock = summary
+          .filter(s => (s.in_stock_reels || 0) > 0)
+          .sort((a, b) => a.item_code.localeCompare(b.item_code));
 
         // Stats
         document.getElementById('statItems').textContent = inStock.length;
