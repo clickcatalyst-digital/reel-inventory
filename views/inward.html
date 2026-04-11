@@ -63,18 +63,35 @@
             </select>
           </div>
           <div class="form-group">
-            <label>
-              <span id="reelInputLabel">Number of Reels</span>
-              <span style="margin-left:10px;">
-                <label style="font-weight:400; font-size:12px; cursor:pointer;">
-                  <input type="radio" name="inputMode" value="reels" checked onchange="toggleInputMode('reels')"> By Reels
-                </label>
-                &nbsp;
-                <label style="font-weight:400; font-size:12px; cursor:pointer;">
-                  <input type="radio" name="inputMode" value="qty" onchange="toggleInputMode('qty')"> By Total Qty
-                </label>
-              </span>
-            </label>
+            <label id="reelInputLabel">Number of Reels</label>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+              <label style="
+                display:flex; align-items:center; gap:6px;
+                padding:6px 14px; border-radius:var(--radius);
+                border:1px solid var(--border); cursor:pointer;
+                font-size:12px; font-weight:500;
+                background:var(--surface); color:var(--text);
+                transition:border-color 0.15s, background 0.15s;
+              " id="modeReelsBtn">
+                <input type="radio" name="inputMode" value="reels" checked
+                  onchange="toggleInputMode('reels')"
+                  style="accent-color:var(--primary); margin:0;">
+                By Reels
+              </label>
+              <label style="
+                display:flex; align-items:center; gap:6px;
+                padding:6px 14px; border-radius:var(--radius);
+                border:1px solid var(--border); cursor:pointer;
+                font-size:12px; font-weight:500;
+                background:var(--surface); color:var(--text);
+                transition:border-color 0.15s, background 0.15s;
+              " id="modeQtyBtn">
+                <input type="radio" name="inputMode" value="qty"
+                  onchange="toggleInputMode('qty')"
+                  style="accent-color:var(--primary); margin:0;">
+                By Total Qty
+              </label>
+            </div>
             <input type="number" id="numReels" class="form-control" placeholder="e.g. 50" min="1" max="500" required>
             <div id="qtyHint" style="display:none; font-size:11px; color:var(--text-muted); margin-top:4px;"></div>
           </div>
@@ -147,20 +164,36 @@
       const input = document.getElementById('numReels');
       const hint = document.getElementById('qtyHint');
       const label = document.getElementById('reelInputLabel');
+      const reelsBtn = document.getElementById('modeReelsBtn');
+      const qtyBtn = document.getElementById('modeQtyBtn');
 
       if (mode === 'qty') {
         label.textContent = 'Total Stock Quantity';
         input.placeholder = 'e.g. 5000';
         input.removeAttribute('max');
+        qtyBtn.style.borderColor = 'var(--primary)';
+        qtyBtn.style.background = 'var(--primary-light, rgba(37,99,235,0.08))';
+        reelsBtn.style.borderColor = 'var(--border)';
+        reelsBtn.style.background = 'var(--surface)';
       } else {
         label.textContent = 'Number of Reels';
         input.placeholder = 'e.g. 50';
         input.setAttribute('max', 500);
         hint.style.display = 'none';
+        reelsBtn.style.borderColor = 'var(--primary)';
+        reelsBtn.style.background = 'var(--primary-light, rgba(37,99,235,0.08))';
+        qtyBtn.style.borderColor = 'var(--border)';
+        qtyBtn.style.background = 'var(--surface)';
       }
       input.value = '';
       updateInfo();
     }
+
+    // Set initial active state on load
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('modeReelsBtn').style.borderColor = 'var(--primary)';
+      document.getElementById('modeReelsBtn').style.background = 'var(--primary-light, rgba(37,99,235,0.08))';
+    });
 
     function getResolvedReels() {
       const code = document.getElementById('itemSelect').value;
