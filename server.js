@@ -54,7 +54,7 @@ function requireLogin(req, res, next) {
       JWT_SECRET,
       { expiresIn: '30d' }
     );
-    res.json({ success: true, username: user.username, token });
+    res.json({ success: true, username: user.username, role: user.role, token });
   });
 
   app.get('/api/logout', (req, res) => {
@@ -65,16 +65,35 @@ function requireLogin(req, res, next) {
   // All routes below require login
   app.use(requireLogin);
 
+  // Redirect client role away from internal pages
+  app.use((req, res, next) => {
+    if (req.user?.role === 'client' && req.path !== '/stock' && !req.path.startsWith('/api/') && !req.path.startsWith('/public/')) {
+      return res.redirect('/stock');
+    }
+    next();
+  });
+
   app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views', 'items.html')));
   app.get('/inward', (req, res) => res.sendFile(path.join(__dirname, 'views', 'inward.html')));
   app.get('/outward', (req, res) => res.sendFile(path.join(__dirname, 'views', 'outward.html')));
   app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'views', 'dashboard.html')));
+  app.get('/requests', (req, res) => res.sendFile(path.join(__dirname, 'views', 'requests.html')));
+  app.get('/stock', (req, res) => res.sendFile(path.join(__dirname, 'views', 'stock.html')));
+
+  app.get('/settings', (req, res) => res.sendFile(path.join(__dirname, 'views', 'settings.html')));
 
   app.use('/api/items', require('./routes/items'));
   app.use('/api/inward', require('./routes/inward'));
   app.use('/api/outward', require('./routes/outward'));
+  app.use('/api/requests', require('./routes/requests'));
+  app.use('/api/settings', require('./routes/settings'));
   app.use('/api/dashboard', require('./routes/dashboard'));
   app.use('/api/labels', require('./utils/pdf'));
+
+  // Lightweight auth info endpoint for frontend role-aware UI
+  app.get('/api/auth/me', (req, res) => {
+    res.json({ username: req.user.username, role: req.user.role });
+  });
 
   const ips = [];
   const nets = os.networkInterfaces();

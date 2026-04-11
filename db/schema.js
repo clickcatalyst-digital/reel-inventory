@@ -59,6 +59,18 @@ async function initDB() {
     value INTEGER NOT NULL DEFAULT 10000
   )`);
 
+  await db.execute(`CREATE TABLE IF NOT EXISTS requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_by TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reviewed_by TEXT,
+    reviewed_at DATETIME,
+    reject_reason TEXT,
+    payload TEXT NOT NULL
+  )`);
+
   await db.execute(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
@@ -81,7 +93,7 @@ async function initDB() {
   const userCount = await db.execute("SELECT COUNT(*) as count FROM users");
   if (userCount.rows[0].count === 0) {
     await db.execute("INSERT INTO users (username, password, role) VALUES ('admin', 'admin123', 'admin')");
-    await db.execute("INSERT INTO users (username, password, role) VALUES ('pranav', 'lstech123', 'user')");
+    await db.execute("INSERT INTO users (username, password, role) VALUES ('pranav', 'lstech123', 'manager')");
     await db.execute("INSERT INTO users (username, password, role) VALUES ('zakir', 'lstech123', 'user')");
     await db.execute("INSERT INTO users (username, password, role) VALUES ('sahil', 'lstech123', 'user')");
     // console.log('Default users created: admin/admin123, pranav/lstech123');

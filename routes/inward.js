@@ -3,6 +3,55 @@
 const express = require('express');
 const router = express.Router();
 const { queryAll, queryOne, execute, getNextReelNumber, getNextBoxNumber, nowIST } = require('../db/schema');
+const { executeInward } = require('../utils/inventory');
+
+// Roles that bypass approval
+const APPROVER_ROLES = ['admin', 'manager'];
+
+// Extracted so both direct-approve and request-approve paths use same logic - handled by inventory.js
+// async function executeInward(item_code, num_reels, num_boxes, notes) {
+//   const item = await queryOne('SELECT * FROM items WHERE item_code = ?', [item_code]);
+//   if (!item) throw new Error(`Item "${item_code}" not found in catalog`);
+
+//   const totalReels = parseInt(num_reels);
+//   const totalBoxes = Number(num_boxes) > 0 ? Number(num_boxes) : 0;
+
+//   const createdBoxes = [];
+//   const createdReels = [];
+
+//   if (totalBoxes === 0) {
+//     for (let r = 0; r < totalReels; r++) {
+//       const reelNumber = await getNextReelNumber();
+//       await execute('INSERT INTO reels (reel_number, item_code, box_number, quantity, notes, inward_date) VALUES (?, ?, ?, ?, ?, ?)',
+//         [reelNumber, item_code, null, item.default_spq, notes || null, nowIST()]);
+//       createdReels.push({ reel_number: reelNumber, item_code, quantity: item.default_spq, box_number: null });
+//     }
+//   } else {
+//     const reelsPerBox = Math.floor(totalReels / totalBoxes);
+//     const remainder = totalReels % totalBoxes;
+
+//     for (let b = 0; b < totalBoxes; b++) {
+//       const boxNumber = await getNextBoxNumber();
+//       const reelsInThisBox = reelsPerBox + (b < remainder ? 1 : 0);
+
+//       await execute('INSERT INTO boxes (box_number, item_code, reel_count, created_at) VALUES (?, ?, ?, ?)',
+//         [boxNumber, item_code, reelsInThisBox, nowIST()]);
+
+//       const boxReels = [];
+//       for (let r = 0; r < reelsInThisBox; r++) {
+//         const reelNumber = await getNextReelNumber();
+//         await execute('INSERT INTO reels (reel_number, item_code, box_number, quantity, notes, inward_date) VALUES (?, ?, ?, ?, ?, ?)',
+//           [reelNumber, item_code, boxNumber, item.default_spq, notes || null, nowIST()]);
+//         boxReels.push({ reel_number: reelNumber, item_code, quantity: item.default_spq });
+//         createdReels.push({ reel_number: reelNumber, item_code, quantity: item.default_spq, box_number: boxNumber });
+//       }
+
+//       createdBoxes.push({ box_number: boxNumber, item_code, reel_count: reelsInThisBox, reels: boxReels });
+//     }
+//   }
+
+//   return { boxes: createdBoxes, reels: createdReels };
+// }
 
 router.post('/', async (req, res) => {
   const { item_code, num_reels, num_boxes, notes } = req.body;
@@ -13,58 +62,46 @@ router.post('/', async (req, res) => {
   const item = await queryOne('SELECT * FROM items WHERE item_code = ?', [item_code]);
   if (!item) return res.status(404).json({ error: `Item "${item_code}" not found in catalog` });
 
-  const totalReels = parseInt(num_reels);
-  const totalBoxes = Number(num_boxes) > 0 ? Number(num_boxes) : 0;
+  const userRole = req.user?.role;
+  const username = req.user?.username;
 
-  const createdBoxes = [];
-  const createdReels = [];
+  // Managers and admins bypass approval
+  if (APPROVER_ROLES.includes(userRole)) {
+    try {
+      const result = await executeInward(item_code, num_reels, num_boxes, notes);
+      const totalBoxes = Number(num_boxes) > 0 ? Number(num_boxes) : 0;
+      return res.json({
+        success: true,
+        approved: true,
+        message: totalBoxes === 0
+          ? `${result.reels.length} reel(s) inwarded for ${item_code} (no box)`
+          : `${result.reels.length} reel(s) in ${result.boxes.length} box(es) inwarded for ${item_code}`,
+        boxes: result.boxes,
+        reels: result.reels
+      });
+    } catch (err) {
+      if (err.message && err.message.includes('UNIQUE')) {
+        return res.status(409).json({ error: 'Duplicate reel number detected. Please try again.' });
+      }
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
+  // Staff: save as pending request
   try {
-    if (totalBoxes === 0) {
-      for (let r = 0; r < totalReels; r++) {
-        const reelNumber = await getNextReelNumber();
-        await execute('INSERT INTO reels (reel_number, item_code, box_number, quantity, notes, inward_date) VALUES (?, ?, ?, ?, ?, ?)',
-          [reelNumber, item_code, null, item.default_spq, notes || null, nowIST()]);
-        createdReels.push({ reel_number: reelNumber, item_code, quantity: item.default_spq, box_number: null });
-      }
-    } else {
-      const reelsPerBox = Math.floor(totalReels / totalBoxes);
-      const remainder = totalReels % totalBoxes;
-
-      for (let b = 0; b < totalBoxes; b++) {
-        const boxNumber = await getNextBoxNumber();
-        const reelsInThisBox = reelsPerBox + (b < remainder ? 1 : 0);
-
-        await execute('INSERT INTO boxes (box_number, item_code, reel_count, created_at) VALUES (?, ?, ?, ?)',
-          [boxNumber, item_code, reelsInThisBox, nowIST()]);
-
-        const boxReels = [];
-        for (let r = 0; r < reelsInThisBox; r++) {
-          const reelNumber = await getNextReelNumber();
-          await execute('INSERT INTO reels (reel_number, item_code, box_number, quantity, notes, inward_date) VALUES (?, ?, ?, ?, ?, ?)',
-            [reelNumber, item_code, boxNumber, item.default_spq, notes || null, nowIST()]);
-          boxReels.push({ reel_number: reelNumber, item_code, quantity: item.default_spq });
-          createdReels.push({ reel_number: reelNumber, item_code, quantity: item.default_spq, box_number: boxNumber });
-        }
-
-        createdBoxes.push({ box_number: boxNumber, item_code, reel_count: reelsInThisBox, reels: boxReels });
-      }
-    }
-
-    res.json({
+    const payload = JSON.stringify({ item_code, num_reels, num_boxes: num_boxes || 0, notes: notes || null });
+    await execute(
+      'INSERT INTO requests (type, status, created_by, created_at, payload) VALUES (?, ?, ?, ?, ?)',
+      ['inward', 'pending', username, nowIST(), payload]
+    );
+    return res.json({
       success: true,
-      message: totalBoxes === 0
-        ? `${createdReels.length} reel(s) inwarded for ${item_code} (no box)`
-        : `${createdReels.length} reel(s) in ${createdBoxes.length} box(es) inwarded for ${item_code}`,
-      boxes: createdBoxes,
-      reels: createdReels
+      approved: false,
+      pending: true,
+      message: `Inward request submitted for approval`
     });
-
   } catch (err) {
-    if (err.message && err.message.includes('UNIQUE')) {
-      return res.status(409).json({ error: 'Duplicate reel number detected. The counter may be out of sync — please try again or contact admin.' });
-    }
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 

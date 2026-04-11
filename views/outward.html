@@ -373,11 +373,12 @@
       btn.textContent = 'Processing...';
 
       let successCount = 0;
+      let pendingCount = 0;
       let errors = [];
 
       for (const reel of cart) {
         try {
-          await api('/api/outward', {
+          const result = await api('/api/outward', {
             method: 'POST',
             body: {
               reel_number: reel.reel_number,
@@ -387,7 +388,11 @@
               notes: notes || undefined
             }
           });
-          successCount++;
+          if (result.pending) {
+            pendingCount++;
+          } else {
+            successCount++;
+          }
         } catch (e) {
           errors.push(`${reel.reel_number}: ${e.message}`);
         }
@@ -395,8 +400,10 @@
 
       if (successCount > 0) {
         showToast(`${successCount} reel(s) outwarded successfully`);
-        // Auto-download packing list
         await downloadPackingList(customer_name, invoice_number, cart, notes);
+      }
+      if (pendingCount > 0) {
+        showToast(`${pendingCount} reel(s) submitted for approval`);
       }
       if (errors.length > 0) {
         showToast(`${errors.length} failed: ${errors[0]}`, 'error');
@@ -501,7 +508,70 @@
       try {
         const outwards = await api('/api/outward/recent?limit=500');
         recentOutwardsPT.load(outwards);
+        renderOutwardSummary(outwards);
       } catch (e) {}
+    }
+
+    function renderOutwardSummary(outwards) {
+      const existing = document.getElementById('outwardSummaryCard');
+      if (existing) existing.remove();
+      if (!outwards || outwards.length === 0) return;
+
+      // Aggregate by item_code
+      const byItem = {};
+      let grandTotal = 0;
+      for (const o of outwards) {
+        if (!byItem[o.item_code]) {
+          byItem[o.item_code] = { item_code: o.item_code, description: o.description, reels: 0, total_qty: 0 };
+        }
+        byItem[o.item_code].reels++;
+        byItem[o.item_code].total_qty += o.quantity_shipped || 0;
+        grandTotal += o.quantity_shipped || 0;
+      }
+
+      const rows = Object.values(byItem).sort((a, b) => b.total_qty - a.total_qty);
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.id = 'outwardSummaryCard';
+      card.innerHTML = `
+        <div class="card-title">Outward Summary — Last 500 Records</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item Code</th>
+                <th>Description</th>
+                <th>Reels</th>
+                <th>Total Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr>
+                  <td><strong>${r.item_code}</strong></td>
+                  <td>${r.description || '—'}</td>
+                  <td>${r.reels}</td>
+                  <td>${formatQty(r.total_qty)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="border-top: 2px solid var(--border);">
+                <td colspan="2"><strong>TOTAL</strong></td>
+                <td><strong>${outwards.length}</strong></td>
+                <td><strong>${formatQty(grandTotal)}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      `;
+
+      // Insert after the recent outwards card
+      const recentContainer = document.querySelector('#recentOutwards-container');
+      if (!recentContainer) return;
+      const recentCard = recentContainer.closest('.card');
+      if (recentCard) recentCard.insertAdjacentElement('afterend', card);
     }
 
     loadRecentOutwards();

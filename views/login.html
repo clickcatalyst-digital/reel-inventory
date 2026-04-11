@@ -55,9 +55,8 @@
         const data = await res.json();
 
         if (res.ok) {
-          // Store token as cookie — survives server restarts
           document.cookie = `token=${data.token}; path=/; max-age=${30*24*60*60}; SameSite=Strict`;
-          window.location.href = '/';
+          window.location.href = data.role === 'client' ? '/stock' : '/';
         } else {
           errorEl.textContent = data.error || 'Login failed';
           errorEl.style.display = 'block';

@@ -10,8 +10,8 @@ const mm = (v) => v * 2.83465;
 const LABEL_W = mm(85);
 const LABEL_H = mm(24);
 const HALF_W = LABEL_W / 2;
-const QR_SIZE = mm(20);   // Biggest QR that fits in 24mm height with minimal padding
-const PAD = mm(1.5);
+const QR_SIZE = mm(18);   // Slightly smaller to allow top/bottom breathing room
+const PAD = mm(2);        // Increased padding for better top/bottom margins
 
 router.post('/generate', async (req, res) => {
   const { reel_numbers } = req.body;
@@ -76,11 +76,11 @@ router.post('/generate', async (req, res) => {
       doc.text(reel.item_code, textX, textTopY + mm(4.5), { width: textW, lineBreak: false });
 
       // Quantity
-      doc.fontSize(7).font('Helvetica').fillColor('#333333');
+      doc.fontSize(7).font('Helvetica-Bold').fillColor('#333333');
       doc.text(`Qty: ${reel.quantity.toLocaleString()}`, textX, textTopY + mm(9), { width: textW, lineBreak: false });
 
       // Date + Time
-      doc.fontSize(7).font('Helvetica').fillColor('#555555');
+      doc.fontSize(7).font('Helvetica-Bold').fillColor('#555555');
       doc.text(`${dateStr}  ${timeStr}`, textX, textTopY + mm(13), { width: textW, lineBreak: false });
     }
 
@@ -155,7 +155,8 @@ router.post('/generate-box', async (req, res) => {
   doc.end();
 });
 
-// POST generate A4 packing list PDF
+
+// POST generate A4 landscape packing list PDF — grouped by item
 router.post('/packing-list', async (req, res) => {
   const { customer_name, invoice_number, reels } = req.body;
 
@@ -163,112 +164,193 @@ router.post('/packing-list', async (req, res) => {
     return res.status(400).json({ error: 'customer_name, invoice_number, and reels array required' });
   }
 
+  // A4 landscape dimensions
+  const PAGE_W = 841.89;
+  const PAGE_H = 595.28;
+  const MARGIN = 40;
+  const CONTENT_W = PAGE_W - MARGIN * 2;
+
   const doc = new PDFDocument({
     size: 'A4',
-    margins: { top: 40, bottom: 40, left: 40, right: 40 }
+    layout: 'landscape',
+    margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }
   });
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=packing_list_${invoice_number}_${Date.now()}.pdf`);
   doc.pipe(res);
 
-  const pageW = 595.28 - 80; // A4 width minus margins
-
-  // Header
-  doc.fontSize(18).font('Helvetica-Bold').fillColor('#000000');
-  doc.text('PACKING LIST', 40, 40, { width: pageW, align: 'center' });
-
-  doc.moveTo(40, 68).lineTo(40 + pageW, 68).lineWidth(2).stroke('#000000');
-
-  // Customer & Invoice info
-  doc.fontSize(10).font('Helvetica-Bold').fillColor('#333333');
-  doc.text('Customer:', 40, 80);
-  doc.font('Helvetica').text(customer_name, 110, 80);
-
-  doc.font('Helvetica-Bold').text('Invoice:', 40, 96);
-  doc.font('Helvetica').text(invoice_number, 110, 96);
-
-  doc.font('Helvetica-Bold').text('Date:', 350, 80);
-  doc.font('Helvetica').text(new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }), 390, 80);
-
-  doc.font('Helvetica-Bold').text('Total Reels:', 350, 96);
-  doc.font('Helvetica').text(String(reels.length), 420, 96);
-
-  // Table header
-  const tableTop = 125;
-  const col = { sn: 40, reel: 80, item: 180, box: 320, qty: 410, qr: 470 };
-
-  doc.moveTo(40, tableTop).lineTo(40 + pageW, tableTop).lineWidth(1).stroke('#cccccc');
-
-  doc.fontSize(8).font('Helvetica-Bold').fillColor('#666666');
-  doc.text('#', col.sn, tableTop + 6);
-  doc.text('REEL NUMBER', col.reel, tableTop + 6);
-  doc.text('ITEM CODE', col.item, tableTop + 6);
-  doc.text('BOX', col.box, tableTop + 6);
-  doc.text('QUANTITY', col.qty, tableTop + 6);
-
-  doc.moveTo(40, tableTop + 20).lineTo(40 + pageW, tableTop + 20).lineWidth(1).stroke('#cccccc');
-
-  // Table rows
-  let y = tableTop + 28;
-  let totalQty = 0;
-
-  for (let i = 0; i < reels.length; i++) {
-    const r = reels[i];
-    totalQty += r.quantity || 0;
-
-    // New page if needed
-    if (y > 760) {
-      doc.addPage();
-      y = 50;
-
-      // Repeat header on new page
-      doc.fontSize(8).font('Helvetica-Bold').fillColor('#666666');
-      doc.text('#', col.sn, y);
-      doc.text('REEL NUMBER', col.reel, y);
-      doc.text('ITEM CODE', col.item, y);
-      doc.text('BOX', col.box, y);
-      doc.text('QUANTITY', col.qty, y);
-      doc.moveTo(40, y + 14).lineTo(40 + pageW, y + 14).lineWidth(1).stroke('#cccccc');
-      y += 22;
+  // --- Group reels by item_code ---
+  const grouped = {};
+  for (const r of reels) {
+    const key = r.item_code;
+    if (!grouped[key]) {
+      grouped[key] = {
+        item_code: r.item_code,
+        description: r.description || '',
+        spq: r.spq || r.default_spq || '—',
+        reels: []
+      };
     }
-
-    // Alternate row background
-    if (i % 2 === 0) {
-      doc.rect(40, y - 4, pageW, 18).fill('#f8f8f5');
-    }
-
-    doc.fontSize(9).font('Helvetica').fillColor('#333333');
-    doc.text(String(i + 1), col.sn, y);
-    doc.font('Helvetica-Bold').text(r.reel_number, col.reel, y);
-    doc.font('Helvetica').text(r.item_code, col.item, y);
-    doc.text(r.box_number || '—', col.box, y);
-    doc.text(r.quantity ? r.quantity.toLocaleString() : '—', col.qty, y);
-
-    y += 18;
+    grouped[key].reels.push(r);
   }
 
-  // Total row
-  doc.moveTo(40, y + 2).lineTo(40 + pageW, y + 2).lineWidth(1).stroke('#cccccc');
-  y += 10;
-  doc.fontSize(10).font('Helvetica-Bold').fillColor('#000000');
-  doc.text('TOTAL', col.item, y);
-  doc.text(`${reels.length} reels`, col.box, y);
-  doc.text(totalQty.toLocaleString(), col.qty, y);
+  // Fetch SPQ from DB for each item (frontend cart may not always carry it)
+  const itemCodes = Object.keys(grouped);
+  const placeholders = itemCodes.map(() => '?').join(',');
+  const items = await queryAll(
+    `SELECT item_code, description, default_spq FROM items WHERE item_code IN (${placeholders})`,
+    itemCodes
+  );
+  for (const item of items) {
+    if (grouped[item.item_code]) {
+      grouped[item.item_code].spq = item.default_spq;
+      if (!grouped[item.item_code].description) {
+        grouped[item.item_code].description = item.description;
+      }
+    }
+  }
 
-  // Footer
-  y += 40;
-  doc.moveTo(40, y).lineTo(40 + pageW, y).dash(2, { space: 2 }).stroke('#cccccc');
+  const rows = Object.values(grouped);
+
+  // --- Column layout (landscape) ---
+  // Sr | Item | Description | SPQ | Reel Qty | Total Item Qty | Reel Numbers
+  const col = {
+    sn:          MARGIN,
+    item:        MARGIN + 30,
+    desc:        MARGIN + 110,
+    spq:         MARGIN + 260,
+    reelQty:     MARGIN + 320,
+    totalQty:    MARGIN + 400,
+    reelNums:    MARGIN + 490,
+  };
+  const COL_WIDTHS = {
+    sn: 28,
+    item: 78,
+    desc: 148,
+    spq: 58,
+    reelQty: 78,
+    totalQty: 88,
+    reelNums: CONTENT_W - 490, // remaining width
+  };
+
+  function drawTableHeader(doc, y) {
+    doc.rect(MARGIN, y, CONTENT_W, 20).fill('#1a1a18');
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#ffffff');
+    doc.text('#',              col.sn,       y + 6, { width: COL_WIDTHS.sn,       lineBreak: false });
+    doc.text('ITEM CODE',     col.item,     y + 6, { width: COL_WIDTHS.item,     lineBreak: false });
+    doc.text('DESCRIPTION',   col.desc,     y + 6, { width: COL_WIDTHS.desc,     lineBreak: false });
+    doc.text('SPQ',           col.spq,      y + 6, { width: COL_WIDTHS.spq,      lineBreak: false });
+    doc.text('REEL QTY',      col.reelQty,  y + 6, { width: COL_WIDTHS.reelQty,  lineBreak: false });
+    doc.text('TOTAL QTY',     col.totalQty, y + 6, { width: COL_WIDTHS.totalQty, lineBreak: false });
+    doc.text('REEL NUMBERS',  col.reelNums, y + 6, { width: COL_WIDTHS.reelNums, lineBreak: false });
+    return y + 22;
+  }
+
+  // --- Header ---
+  doc.fontSize(20).font('Helvetica-Bold').fillColor('#000000');
+  doc.text('PACKING LIST', MARGIN, MARGIN, { width: CONTENT_W, align: 'center' });
+
+  doc.moveTo(MARGIN, MARGIN + 26).lineTo(MARGIN + CONTENT_W, MARGIN + 26).lineWidth(2).stroke('#000000');
+
+  // Meta info row
+  const metaY = MARGIN + 34;
+  doc.fontSize(9).font('Helvetica-Bold').fillColor('#333333');
+  doc.text('Customer:',  MARGIN,       metaY);
+  doc.font('Helvetica').text(customer_name, MARGIN + 65, metaY);
+
+  doc.font('Helvetica-Bold').text('Invoice:',   MARGIN + 280, metaY);
+  doc.font('Helvetica').text(invoice_number,    MARGIN + 330, metaY);
+
+  doc.font('Helvetica-Bold').text('Date:',      MARGIN + 530, metaY);
+  doc.font('Helvetica').text(
+    new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+    MARGIN + 558, metaY
+  );
+
+  doc.font('Helvetica-Bold').text('Total Reels:', MARGIN + 650, metaY);
+  doc.font('Helvetica').text(String(reels.length), MARGIN + 718, metaY);
+
+  // --- Table ---
+  let y = metaY + 22;
+  y = drawTableHeader(doc, y);
+
+  let grandTotalQty = 0;
+  let grandTotalReels = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const reelQtys = row.reels.map(r => r.quantity);
+    const totalItemQty = reelQtys.reduce((s, q) => s + (q || 0), 0);
+    const reelNumbers = row.reels.map(r => r.reel_number.replace('REEL-', '')).join(', ');
+
+    // Determine reel qty display
+    const uniqueQtys = [...new Set(reelQtys)];
+    const reelQtyDisplay = uniqueQtys.length === 1
+      ? uniqueQtys[0].toLocaleString()
+      : 'Mixed';
+
+    grandTotalQty += totalItemQty;
+    grandTotalReels += row.reels.length;
+
+    // Estimate row height — reel numbers may wrap
+    const reelNumsWidth = COL_WIDTHS.reelNums;
+    const estimatedLines = Math.ceil((reelNumbers.length * 5.5) / reelNumsWidth) + 1;
+    const rowH = Math.max(20, estimatedLines * 11 + 8);
+
+    // New page if needed
+    if (y + rowH > PAGE_H - MARGIN - 40) {
+      doc.addPage({ size: 'A4', layout: 'landscape' });
+      y = MARGIN;
+      y = drawTableHeader(doc, y);
+    }
+
+    // Alternate row shading
+    if (i % 2 === 0) {
+      doc.rect(MARGIN, y, CONTENT_W, rowH).fill('#f8f8f5');
+    }
+
+    doc.fontSize(8).fillColor('#333333');
+
+    doc.font('Helvetica').text(String(i + 1),          col.sn,       y + 6, { width: COL_WIDTHS.sn,       lineBreak: false });
+    doc.font('Helvetica-Bold').text(row.item_code,     col.item,     y + 6, { width: COL_WIDTHS.item,     lineBreak: false });
+    doc.font('Helvetica').text(row.description,        col.desc,     y + 6, { width: COL_WIDTHS.desc,     lineBreak: false });
+    doc.text(String(row.spq),                          col.spq,      y + 6, { width: COL_WIDTHS.spq,      lineBreak: false });
+    doc.text(reelQtyDisplay,                           col.reelQty,  y + 6, { width: COL_WIDTHS.reelQty,  lineBreak: false });
+    doc.font('Helvetica-Bold').text(totalItemQty.toLocaleString(), col.totalQty, y + 6, { width: COL_WIDTHS.totalQty, lineBreak: false });
+    doc.font('Helvetica').fontSize(7).text(reelNumbers, col.reelNums, y + 6, { width: COL_WIDTHS.reelNums, lineBreak: true });
+
+    // Row bottom border
+    doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + CONTENT_W, y + rowH).lineWidth(0.5).stroke('#dddddd');
+
+    y += rowH;
+  }
+
+  // --- Totals row ---
+  y += 4;
+  doc.rect(MARGIN, y, CONTENT_W, 22).fill('#f0f0ec');
+  doc.fontSize(9).font('Helvetica-Bold').fillColor('#000000');
+  doc.text('TOTAL',                          col.desc,     y + 6, { width: COL_WIDTHS.desc,     lineBreak: false });
+  doc.text(`${grandTotalReels} reels`,       col.reelQty,  y + 6, { width: COL_WIDTHS.reelQty,  lineBreak: false });
+  doc.text(grandTotalQty.toLocaleString(),   col.totalQty, y + 6, { width: COL_WIDTHS.totalQty, lineBreak: false });
+
+  // --- Footer ---
+  y += 36;
+  if (y + 50 > PAGE_H - MARGIN) {
+    doc.addPage({ size: 'A4', layout: 'landscape' });
+    y = MARGIN;
+  }
+
+  doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y).dash(2, { space: 2 }).lineWidth(0.5).stroke('#cccccc');
   doc.undash();
-  y += 15;
+  y += 14;
 
   doc.fontSize(8).font('Helvetica').fillColor('#999999');
-  doc.text('Receiver Signature: ________________________', 40, y);
-  doc.text('Date: ________________________', 350, y);
-
-  y += 30;
-  doc.text('Checked by: ________________________', 40, y);
-  doc.text('Remarks: ________________________', 350, y);
+  doc.text('Receiver Signature: ________________________', MARGIN, y);
+  doc.text('Date: ________________________', MARGIN + 320, y);
+  y += 24;
+  doc.text('Checked by: ________________________', MARGIN, y);
+  doc.text('Remarks: ________________________', MARGIN + 320, y);
 
   doc.end();
 });

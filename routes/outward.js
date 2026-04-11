@@ -3,6 +3,9 @@
 const express = require('express');
 const router = express.Router();
 const { queryAll, queryOne, execute, nowIST } = require('../db/schema');
+const { executeOutwardReel } = require('../utils/inventory');
+
+const APPROVER_ROLES = ['admin', 'manager'];
 
 router.get('/reel/:reelNumber', async (req, res) => {
   const reel = await queryOne(`
@@ -45,46 +48,86 @@ router.get('/box/:boxNumber', async (req, res) => {
   });
 });
 
+// Extracted so both direct-approve and request-approve paths use same logic
+// async function executeOutwardReel(reel_number, customer_name, invoice_number, outward_type, quantity_shipped, notes) {
+//   const reel = await queryOne('SELECT * FROM reels WHERE reel_number = ?', [reel_number]);
+//   if (!reel) throw new Error(`Reel ${reel_number} not found`);
+//   if (reel.status === 'Outwarded') throw new Error(`Reel ${reel_number} already outwarded`);
+
+//   const type = outward_type || 'Full';
+//   let qtyShipped;
+
+//   if (type === 'Partial') {
+//     qtyShipped = parseInt(quantity_shipped);
+//     if (!qtyShipped || qtyShipped <= 0 || qtyShipped >= reel.quantity) {
+//       throw new Error(`Partial quantity must be between 1 and ${reel.quantity - 1}`);
+//     }
+//   } else {
+//     qtyShipped = reel.quantity;
+//   }
+
+//   await execute(
+//     `INSERT INTO outwards (reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes, outward_date)
+//      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+//     [reel_number, customer_name.trim(), invoice_number.trim(), qtyShipped, type, notes || null, nowIST()]
+//   );
+
+//   if (type === 'Full') {
+//     await execute('UPDATE reels SET quantity = 0, status = ? WHERE reel_number = ?', ['Outwarded', reel_number]);
+//   } else {
+//     await execute('UPDATE reels SET quantity = ? WHERE reel_number = ?', [reel.quantity - qtyShipped, reel_number]);
+//   }
+
+//   return { qtyShipped, remaining: type === 'Full' ? 0 : reel.quantity - qtyShipped };
+// }
+
 router.post('/', async (req, res) => {
   const { reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes } = req.body;
   if (!reel_number || !customer_name || !invoice_number) {
     return res.status(400).json({ error: 'reel_number, customer_name, and invoice_number are required' });
   }
 
+  const userRole = req.user?.role;
+  const username = req.user?.username;
+
+  if (APPROVER_ROLES.includes(userRole)) {
+    try {
+      const result = await executeOutwardReel(reel_number, customer_name, invoice_number, outward_type, quantity_shipped, notes);
+      return res.json({
+        success: true,
+        approved: true,
+        message: `Outward recorded: ${result.qtyShipped} units from ${reel_number}`,
+        remaining: result.remaining
+      });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  }
+
+  // Staff: check reel exists and is in stock first, then save as pending
   const reel = await queryOne('SELECT * FROM reels WHERE reel_number = ?', [reel_number]);
   if (!reel) return res.status(404).json({ error: 'Reel not found' });
   if (reel.status === 'Outwarded') return res.status(400).json({ error: 'Reel already fully outwarded' });
 
-  const type = outward_type || 'Full';
-  let qtyShipped;
-
-  if (type === 'Partial') {
-    qtyShipped = parseInt(quantity_shipped);
-    if (!qtyShipped || qtyShipped <= 0 || qtyShipped >= reel.quantity) {
-      return res.status(400).json({ error: `Partial quantity must be between 1 and ${reel.quantity - 1}` });
-    }
-  } else {
-    qtyShipped = reel.quantity;
-  }
-
   try {
-    await execute(`INSERT INTO outwards (reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes, outward_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [reel_number, customer_name.trim(), invoice_number.trim(), qtyShipped, type, notes || null, nowIST()]);
-
-    if (type === 'Full') {
-      await execute('UPDATE reels SET quantity = 0, status = ? WHERE reel_number = ?', ['Outwarded', reel_number]);
-    } else {
-      await execute('UPDATE reels SET quantity = ? WHERE reel_number = ?', [reel.quantity - qtyShipped, reel_number]);
-    }
-
-    res.json({
+    const payload = JSON.stringify({
+      reel_number, customer_name, invoice_number,
+      outward_type: outward_type || 'Full',
+      quantity_shipped: quantity_shipped || null,
+      notes: notes || null
+    });
+    await execute(
+      'INSERT INTO requests (type, status, created_by, created_at, payload) VALUES (?, ?, ?, ?, ?)',
+      ['outward', 'pending', username, nowIST(), payload]
+    );
+    return res.json({
       success: true,
-      message: `${type} outward recorded: ${qtyShipped} units from ${reel_number}`,
-      remaining: type === 'Full' ? 0 : reel.quantity - qtyShipped
+      approved: false,
+      pending: true,
+      message: `Outward request submitted for approval`
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -108,31 +151,56 @@ router.post('/box', async (req, res) => {
     });
   }
 
-  const results = { success: [], skipped: [] };
+  const userRole = req.user?.role;
+  const username = req.user?.username;
 
-  try {
-    for (const reel of reels) {
-      if (reel.status === 'Outwarded') {
-        results.skipped.push({ reel_number: reel.reel_number, reason: 'Already outwarded' });
-        continue;
+  if (APPROVER_ROLES.includes(userRole)) {
+    const results = { success: [], skipped: [] };
+    try {
+      for (const reel of reels) {
+        if (reel.status === 'Outwarded') {
+          results.skipped.push({ reel_number: reel.reel_number, reason: 'Already outwarded' });
+          continue;
+        }
+        await execute(
+          `INSERT INTO outwards (reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes, outward_date)
+           VALUES (?, ?, ?, ?, 'Full', ?, ?)`,
+          [reel.reel_number, customer_name.trim(), invoice_number.trim(), reel.quantity, notes || null, nowIST()]
+        );
+        await execute('UPDATE reels SET quantity = 0, status = ? WHERE reel_number = ?', ['Outwarded', reel.reel_number]);
+        results.success.push(reel.reel_number);
       }
-
-      await execute(`INSERT INTO outwards (reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes, outward_date)
-        VALUES (?, ?, ?, ?, 'Full', ?, ?)`,
-        [reel.reel_number, customer_name.trim(), invoice_number.trim(), reel.quantity, notes || null, nowIST()]);
-
-      await execute('UPDATE reels SET quantity = 0, status = ? WHERE reel_number = ?', ['Outwarded', reel.reel_number]);
-      results.success.push(reel.reel_number);
+      let message = `${results.success.length} reel(s) outwarded from ${box_number}`;
+      if (results.skipped.length > 0) {
+        message += `. ${results.skipped.length} skipped (already outwarded)`;
+      }
+      return res.json({ success: true, approved: true, message, results });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
     }
+  }
 
-    let message = `${results.success.length} reel(s) outwarded from ${box_number}`;
-    if (results.skipped.length > 0) {
-      message += `. ${results.skipped.length} reel(s) skipped (already outwarded: ${results.skipped.map(s => s.reel_number).join(', ')})`;
-    }
-
-    res.json({ success: true, message, results });
+  // Staff: save entire box outward as single pending request
+  try {
+    const payload = JSON.stringify({
+      box_number,
+      customer_name,
+      invoice_number,
+      notes: notes || null,
+      reel_numbers: inStock.map(r => r.reel_number)
+    });
+    await execute(
+      'INSERT INTO requests (type, status, created_by, created_at, payload) VALUES (?, ?, ?, ?, ?)',
+      ['outward', 'pending', username, nowIST(), payload]
+    );
+    return res.json({
+      success: true,
+      approved: false,
+      pending: true,
+      message: `Box outward request submitted for approval (${inStock.length} reels)`
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
