@@ -133,8 +133,9 @@
     <!-- Recent Inwards -->
     <div class="card">
       <div id="recentTable-container"></div>
-      <div style="margin-top:12px;">
+      <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn btn-ghost btn-sm" onclick="reprintSelected()">Reprint Selected Labels</button>
+        <button class="btn btn-danger btn-sm" onclick="undoSelected()">Undo Selected Inward</button>
       </div>
     </div>
   </div>
@@ -373,7 +374,7 @@
       pageSize: 10,
       titleText: 'Recent Inwards',
       columns: [
-        { label: '<input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">', render: r => `<input type="checkbox" class="reel-check" value="${r.reel_number}">` },
+        { label: '<input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">', render: r => `<input type="checkbox" class="reel-check" value="${r.reel_number}" data-box="${r.box_number || ''}">` },
         { label: 'Reel', render: r => `<strong>${r.reel_number}</strong>` },
         { label: 'Box', render: r => r.box_number || '—' },
         { label: 'Item', render: r => r.item_code },
@@ -395,9 +396,42 @@
     }
 
     async function reprintSelected() {
+      const checkboxes = [...document.querySelectorAll('.reel-check:checked')];
+      if (!checkboxes.length) return showToast('Select at least one reel', 'error');
+
+      const reelNumbers = checkboxes.map(cb => cb.value);
+      const boxNumbers = [...new Set(checkboxes.map(cb => cb.dataset.box).filter(Boolean))];
+
+      if (boxNumbers.length > 0) {
+        const printBoxes = confirm(
+          `Selected reels belong to ${boxNumbers.length} box(es).\n\nOK = Download Box Labels\nCancel = Download Reel Labels`
+        );
+        if (printBoxes) {
+          await downloadPDF('/api/labels/generate-box', { box_numbers: boxNumbers }, 'box_labels_reprint');
+          return;
+        }
+      }
+
+      await downloadPDF('/api/labels/generate', { reel_numbers: reelNumbers }, 'labels_reprint');
+    }
+
+    async function undoSelected() {
       const selected = [...document.querySelectorAll('.reel-check:checked')].map(cb => cb.value);
       if (!selected.length) return showToast('Select at least one reel', 'error');
-      await downloadPDF('/api/labels/generate', { reel_numbers: selected }, 'labels_reprint');
+
+      const password = prompt(
+        `Undo inward for ${selected.length} reel(s)?\n\nThis will mark them as Deleted and clean up empty boxes.\nOutwarded reels will be skipped.\n\nEnter password to confirm:`
+      );
+      if (!password) return;
+
+      try {
+        const result = await api('/api/inward/undo', {
+          method: 'POST',
+          body: { reel_numbers: selected, password }
+        });
+        showToast(result.message);
+        loadRecent();
+      } catch (e) {}
     }
 
     loadItemDropdown();

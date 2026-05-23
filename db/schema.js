@@ -21,8 +21,16 @@ async function initDB() {
     item_code TEXT UNIQUE NOT NULL,
     description TEXT NOT NULL,
     default_spq INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  // Migration: add status column to existing databases that predate this change
+  try {
+    await db.execute(`ALTER TABLE items ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`);
+  } catch (e) {
+    // Column already exists — safe to ignore
+  }
 
   await db.execute(`CREATE TABLE IF NOT EXISTS boxes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

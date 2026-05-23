@@ -5,7 +5,7 @@ const router = express.Router();
 const { queryAll, queryOne, execute } = require('../db/schema');
 
 router.get('/', async (req, res) => {
-  const items = await queryAll('SELECT * FROM items ORDER BY created_at DESC');
+  const items = await queryAll("SELECT * FROM items WHERE status != 'Deleted' ORDER BY created_at DESC");
   res.json(items);
 });
 
@@ -20,14 +20,26 @@ router.post('/', async (req, res) => {
   if (!item_code || !description || !default_spq) {
     return res.status(400).json({ error: 'item_code, description, and default_spq are required' });
   }
+  const normalized = item_code.trim().toUpperCase();
   try {
-    await execute('INSERT INTO items (item_code, description, default_spq) VALUES (?, ?, ?)',
-      [item_code.trim().toUpperCase(), description.trim(), parseInt(default_spq)]);
-    res.json({ success: true, message: `Item ${item_code} added` });
-  } catch (err) {
-    if (err.message.includes('UNIQUE')) {
-      return res.status(409).json({ error: `Item code "${item_code}" already exists` });
+    // Check if a deleted item with this code already exists — restore it instead
+    const existing = await queryOne('SELECT * FROM items WHERE item_code = ?', [normalized]);
+    if (existing) {
+      if (existing.status !== 'Deleted') {
+        return res.status(409).json({ error: `Item code "${normalized}" already exists` });
+      }
+      // Restore the archived item with new details
+      await execute(
+        "UPDATE items SET description = ?, default_spq = ?, status = 'active' WHERE item_code = ?",
+        [description.trim(), parseInt(default_spq), normalized]
+      );
+      return res.json({ success: true, message: `Item ${normalized} restored from archive` });
     }
+
+    await execute('INSERT INTO items (item_code, description, default_spq) VALUES (?, ?, ?)',
+      [normalized, description.trim(), parseInt(default_spq)]);
+    res.json({ success: true, message: `Item ${normalized} added` });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -41,13 +53,13 @@ router.put('/:itemCode', async (req, res) => {
 });
 
 router.delete('/:itemCode', async (req, res) => {
-  const reelCount = await queryOne('SELECT COUNT(*) as count FROM reels WHERE item_code = ?', [req.params.itemCode]);
-  if (reelCount && reelCount.count > 0) {
-    return res.status(400).json({ error: `Cannot delete - ${reelCount.count} reels exist for this item` });
-  }
-  const result = await execute('DELETE FROM items WHERE item_code = ?', [req.params.itemCode]);
+  const item = await queryOne('SELECT * FROM items WHERE item_code = ?', [req.params.itemCode]);
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+  if (item.status === 'Deleted') return res.status(400).json({ error: 'Item already archived' });
+
+  const result = await execute("UPDATE items SET status = 'Deleted' WHERE item_code = ?", [req.params.itemCode]);
   if (result.changes === 0) return res.status(404).json({ error: 'Item not found' });
-  res.json({ success: true, message: 'Item deleted' });
+  res.json({ success: true, message: `Item ${req.params.itemCode} archived` });
 });
 
 module.exports = router;

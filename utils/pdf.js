@@ -11,7 +11,7 @@ const LABEL_W = mm(85);
 const LABEL_H = mm(24);
 const HALF_W = LABEL_W / 2;
 const QR_SIZE = mm(21);   // Slightly smaller to allow top/bottom breathing room
-const PAD = mm(1.5);        // Increased padding for better top/bottom margins
+const PAD = mm(3);        // Increased padding for better top/bottom margins
 
 router.post('/generate', async (req, res) => {
   const { reel_numbers } = req.body;
@@ -22,7 +22,7 @@ router.post('/generate', async (req, res) => {
 
   const placeholders = reel_numbers.map(() => '?').join(',');
   const reels = await queryAll(`
-    SELECT r.reel_number, r.item_code, r.quantity, r.inward_date, i.description
+    SELECT r.reel_number, r.item_code, r.quantity, r.inward_date, r.notes, i.description
     FROM reels r
     JOIN items i ON r.item_code = i.item_code
     WHERE r.reel_number IN (${placeholders})
@@ -41,6 +41,20 @@ router.post('/generate', async (req, res) => {
 
   const qrY = (LABEL_H - QR_SIZE) / 2; // vertically center QR
 
+  // for (let i = 0; i < reels.length; i += 2) {
+  //   if (i > 0) doc.addPage();
+
+  //   const pair = [reels[i], reels[i + 1]].filter(Boolean);
+
+  //   for (let s = 0; s < pair.length; s++) {
+  //     const reel = pair[s];
+  //     const xOffset = s * HALF_W;
+
+  //     const qrBuffer = await generateQRBuffer(reel.reel_number);
+
+  // Generate all QR buffers in parallel — critical for large inwards
+  const qrBuffers = await Promise.all(reels.map(r => generateQRBuffer(r.reel_number)));
+
   for (let i = 0; i < reels.length; i += 2) {
     if (i > 0) doc.addPage();
 
@@ -50,21 +64,24 @@ router.post('/generate', async (req, res) => {
       const reel = pair[s];
       const xOffset = s * HALF_W;
 
-      const qrBuffer = await generateQRBuffer(reel.reel_number);
+      const qrBuffer = qrBuffers[i + s];
 
-      const dateStr = reel.inward_date
-        ? new Date(reel.inward_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-        : '—';
-      const timeStr = reel.inward_date
-        ? new Date(reel.inward_date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-        : '';
+      // const dateStr = reel.inward_date
+      //   ? new Date(reel.inward_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      //   : '—';
+      // const timeStr = reel.inward_date
+      //   ? new Date(reel.inward_date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+      //   : '';
 
       // QR code - vertically centered
       doc.image(qrBuffer, xOffset + PAD, qrY, { width: QR_SIZE, height: QR_SIZE });
 
       // Text area - starts aligned with top of QR
       const textX = xOffset + PAD + QR_SIZE + mm(2);
-      const textW = HALF_W - QR_SIZE - PAD * 2 - mm(2);
+      // const textW = HALF_W - QR_SIZE - PAD * 2 - mm(2);
+      const textW = HALF_W - QR_SIZE - PAD - mm(2) - mm(1);
+      // PAD protects outer edge, mm(2) is QR-to-text gap, mm(1) is inner buffer
+      // gives 42.5 - 21 - 3 - 2 - 1 = 15.5mm — workable
       // Distribute 4 lines evenly across QR height
       // Fixed positions relative to qrY — tuned visually for 20mm QR on 24mm label
       doc.fontSize(11).font('Helvetica-Bold').fillColor('#000000');
@@ -76,8 +93,12 @@ router.post('/generate', async (req, res) => {
       doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#333333');
       doc.text(`Qty: ${reel.quantity.toLocaleString()}`, textX, qrY + mm(10), { width: textW, lineBreak: false });
 
-      doc.fontSize(8).font('Helvetica-Bold').fillColor('#555555');
-      doc.text(dateStr, textX, qrY + mm(17.5), { width: textW, lineBreak: false });
+      // doc.fontSize(8).font('Helvetica-Bold').fillColor('#555555');
+      // doc.text(dateStr, textX, qrY + mm(17.5), { width: textW, lineBreak: false });
+      if (reel.notes) {
+        doc.fontSize(8).font('Helvetica-Bold').fillColor('#555555');
+        doc.text(`Batch: ${reel.notes}`, textX, qrY + mm(17.5), { width: textW, lineBreak: false });
+      }
     }
 
     // Center divider

@@ -118,4 +118,46 @@ router.get('/recent', async (req, res) => {
   res.json(reels);
 });
 
+router.post('/undo', async (req, res) => {
+  const { reel_numbers, password } = req.body;
+
+  if (password !== 'admin123') {
+    return res.status(403).json({ error: 'Incorrect password' });
+  }
+
+  if (!reel_numbers || !reel_numbers.length) {
+    return res.status(400).json({ error: 'reel_numbers required' });
+  }
+
+  const boxNumbers = new Set();
+  let undone = 0;
+  let skipped = 0;
+
+  for (const rn of reel_numbers) {
+    const reel = await queryOne('SELECT * FROM reels WHERE reel_number = ?', [rn]);
+    if (!reel) { skipped++; continue; }
+    if (reel.status === 'Outwarded') { skipped++; continue; }
+    if (reel.box_number) boxNumbers.add(reel.box_number);
+
+    await execute("UPDATE reels SET status = 'Deleted', quantity = 0 WHERE reel_number = ?", [rn]);
+    undone++;
+  }
+
+  // Clean up any box whose reels are now all Deleted
+  for (const bn of boxNumbers) {
+    const remaining = await queryOne(
+      "SELECT COUNT(*) as count FROM reels WHERE box_number = ? AND status != 'Deleted'",
+      [bn]
+    );
+    if (remaining && remaining.count === 0) {
+      await execute('DELETE FROM boxes WHERE box_number = ?', [bn]);
+    }
+  }
+
+  res.json({
+    success: true,
+    message: `${undone} reel(s) undone${skipped ? `, ${skipped} skipped (outwarded or not found)` : ''}`
+  });
+});
+
 module.exports = router;

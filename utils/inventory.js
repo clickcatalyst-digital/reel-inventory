@@ -3,6 +3,7 @@ const { queryAll, queryOne, execute, getNextReelNumber, getNextBoxNumber, nowIST
 async function executeInward(item_code, num_reels, num_boxes, notes) {
   const item = await queryOne('SELECT * FROM items WHERE item_code = ?', [item_code]);
   if (!item) throw new Error(`Item "${item_code}" not found in catalog`);
+  if (item.status === 'Deleted') throw new Error(`Item "${item_code}" has been archived and cannot receive stock`);
 
   const totalReels = parseInt(num_reels);
   const totalBoxes = Number(num_boxes) > 0 ? Number(num_boxes) : 0;
