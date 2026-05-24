@@ -97,7 +97,7 @@ router.post('/generate', async (req, res) => {
       // doc.text(dateStr, textX, qrY + mm(17.5), { width: textW, lineBreak: false });
       if (reel.notes) {
         doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#555555');
-        doc.text(`Batch: ${reel.notes}`, textX, qrY + mm(17.5), { width: textW, lineBreak: false });
+        doc.text(`Batch: ${reel.notes}`, textX, qrY + mm(17.5), { width: textW, lineBreak: false, ellipsis: true });
       }
     }
 
