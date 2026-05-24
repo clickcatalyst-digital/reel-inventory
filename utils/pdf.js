@@ -13,6 +13,16 @@ const HALF_W = LABEL_W / 2;
 const QR_SIZE = mm(21);   // Slightly smaller to allow top/bottom breathing room
 const PAD = mm(3);        // Increased padding for better top/bottom margins
 
+function fitFontSize(doc, text, font, maxWidth, startSize, minSize = 6) {
+  let size = startSize;
+  doc.font(font).fontSize(size);
+  while (size > minSize && doc.widthOfString(text) > maxWidth) {
+    size -= 0.5;
+    doc.fontSize(size);
+  }
+  return size;
+}
+
 router.post('/generate', async (req, res) => {
   const { reel_numbers } = req.body;
 
@@ -84,17 +94,26 @@ router.post('/generate', async (req, res) => {
       // gives 42.5 - 21 - 3 - 2 - 1 = 15.5mm — workable
       // Distribute 4 lines evenly across QR height
       // Fixed positions relative to qrY — tuned visually for 20mm QR on 24mm label
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#000000');
+      // doc.fontSize(11).font('Helvetica-Bold').fillColor('#000000');
+      // doc.text(reel.reel_number.replace('REEL-', ''), textX, qrY + mm(1), { width: textW, lineBreak: false });
+
+      // doc.fontSize(8).font('Helvetica-Bold').fillColor('#222222');
+      // doc.text(reel.item_code, textX, qrY + mm(5.5), { width: textW, lineBreak: false });
+
+      // doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#333333');
+      // doc.text(`Qty: ${reel.quantity.toLocaleString()}`, textX, qrY + mm(10), { width: textW, lineBreak: false });
+
+      fitFontSize(doc, reel.reel_number.replace('REEL-', ''), 'Helvetica-Bold', textW, 11);
+      doc.fillColor('#000000');
       doc.text(reel.reel_number.replace('REEL-', ''), textX, qrY + mm(1), { width: textW, lineBreak: false });
 
-      doc.fontSize(8).font('Helvetica-Bold').fillColor('#222222');
+      fitFontSize(doc, reel.item_code, 'Helvetica-Bold', textW, 8);
+      doc.fillColor('#222222');
       doc.text(reel.item_code, textX, qrY + mm(5.5), { width: textW, lineBreak: false });
 
-      doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#333333');
+      fitFontSize(doc, `Qty: ${reel.quantity.toLocaleString()}`, 'Helvetica-Bold', textW, 8.5);
+      doc.fillColor('#333333');
       doc.text(`Qty: ${reel.quantity.toLocaleString()}`, textX, qrY + mm(10), { width: textW, lineBreak: false });
-
-      // doc.fontSize(8).font('Helvetica-Bold').fillColor('#555555');
-      // doc.text(dateStr, textX, qrY + mm(17.5), { width: textW, lineBreak: false });
       if (reel.notes) {
         doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#555555');
         doc.text(`Batch: ${reel.notes}`, textX, qrY + mm(17.5), { width: textW, lineBreak: false, ellipsis: true });
