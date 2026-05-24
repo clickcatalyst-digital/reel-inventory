@@ -273,7 +273,7 @@
       const numBoxes = perBox > 0 ? numReels / perBox : 0;
 
       const overlay = document.getElementById('pdfOverlay');
-      overlay.style.display = 'flex';
+      overlay.classList.add('active');
       document.getElementById('overlayMessage').textContent = 'Generating PDF...';
       try {
           const data = await api('/api/inward', {
@@ -332,7 +332,7 @@
         loadRecent();
       } catch (e) {
       } finally {
-        document.getElementById('pdfOverlay').style.display = 'none';
+        document.getElementById('pdfOverlay').classList.remove('active');
       }
     });
 
@@ -350,8 +350,8 @@
 
     async function downloadPDF(url, body, prefix) {
       const overlay = document.getElementById('pdfOverlay');
-      overlay.style.display = 'flex';
-      document.getElementById('overlayMessage').textContent = 'Processing Inward...';
+      overlay.classList.add('active');
+      document.getElementById('overlayMessage').textContent = 'Generating PDF...';
       try {
         const res = await fetch(url, {
           method: 'POST',
@@ -369,7 +369,7 @@
       } catch (e) {
         showToast('Failed to generate PDF', 'error');
       } finally {
-        overlay.style.display = 'none';
+        document.getElementById('pdfOverlay').classList.remove('active');
       }
     }
 
@@ -472,7 +472,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
   </button>
   <div id="pdfOverlay" style="
-    display:none; position:fixed; inset:0; z-index:9999;
+    position:fixed; inset:0; z-index:9999;
     background:rgba(0,0,0,0.5); 
     flex-direction:column; align-items:center; justify-content:center; gap:16px;
   ">
@@ -488,6 +488,8 @@
 
   <style>
     @keyframes spin { to { transform: rotate(360deg); } }
+    #pdfOverlay { display: none; }
+    #pdfOverlay.active { display: flex !important; }
   </style>
 </body>
 </html>
