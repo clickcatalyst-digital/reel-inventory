@@ -88,6 +88,7 @@ function requireLogin(req, res, next) {
   app.use('/api/requests', require('./routes/requests'));
   app.use('/api/settings', require('./routes/settings'));
   app.use('/api/dashboard', require('./routes/dashboard'));
+  app.use('/api/po', require('./routes/po'));
   app.use('/api/labels', require('./utils/pdf'));
 
   // Lightweight auth info endpoint for frontend role-aware UI

@@ -62,6 +62,13 @@ function formatQty(n) {
   return (n || 0).toLocaleString('en-IN');
 }
 
+function esc(v) {
+  if (v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ========== NAVBAR ACTIVE STATE ==========
 document.addEventListener('DOMContentLoaded', () => {
   const path = window.location.pathname;
