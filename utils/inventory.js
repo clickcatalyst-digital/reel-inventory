@@ -46,7 +46,7 @@ async function executeInward(item_code, num_reels, num_boxes, notes) {
   return { boxes: createdBoxes, reels: createdReels };
 }
 
-async function executeOutwardReel(reel_number, customer_name, invoice_number, outward_type, quantity_shipped, notes) {
+async function executeOutwardReel(reel_number, customer_name, invoice_number, outward_type, quantity_shipped, notes, company_id, po_id) {
   const reel = await queryOne('SELECT * FROM reels WHERE reel_number = ?', [reel_number]);
   if (!reel) throw new Error(`Reel ${reel_number} not found`);
   if (reel.status === 'Outwarded') throw new Error(`Reel ${reel_number} already outwarded`);
@@ -64,9 +64,9 @@ async function executeOutwardReel(reel_number, customer_name, invoice_number, ou
   }
 
   await execute(
-    `INSERT INTO outwards (reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes, outward_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [reel_number, customer_name.trim(), invoice_number.trim(), qtyShipped, type, notes || null, nowIST()]
+    `INSERT INTO outwards (reel_number, customer_name, invoice_number, quantity_shipped, outward_type, notes, outward_date, company_id, po_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [reel_number, customer_name.trim(), invoice_number.trim(), qtyShipped, type, notes || null, nowIST(), company_id || null, po_id || null]
   );
 
   if (type === 'Full') {

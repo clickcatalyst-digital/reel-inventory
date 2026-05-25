@@ -28,6 +28,18 @@
       display: inline-block; background: var(--primary); color: #fff; font-size: 11px;
       font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 8px;
     }
+    .cust-suggest {
+      position:absolute; top:100%; left:0; right:0; z-index:50;
+      background:var(--surface); border:1px solid var(--border); border-top:none;
+      border-radius:0 0 var(--radius) var(--radius); max-height:220px; overflow-y:auto;
+      box-shadow:0 8px 24px rgba(0,0,0,0.12);
+    }
+    .cust-suggest div {
+      padding:9px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--border);
+    }
+    .cust-suggest div:last-child { border-bottom:none; }
+    .cust-suggest div:hover, .cust-suggest div.active { background:var(--bg); }
+    .cust-suggest .no-match { color:var(--text-muted); cursor:default; font-style:italic; }
   </style>
 </head>
 <body>
@@ -101,14 +113,23 @@
       <div id="cartSkipped" style="display:none; margin-top:8px;"></div>
       <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px;">
         <div class="form-row">
-          <div class="form-group">
+          <div class="form-group" style="position:relative;">
             <label>Customer Name</label>
-            <input type="text" id="customerName" class="form-control" placeholder="e.g. ABC Electronics">
+            <input type="text" id="customerName" class="form-control" placeholder="Start typing a CRM company…" autocomplete="off"
+                   oninput="onCustomerInput()" onfocus="onCustomerInput()">
+            <input type="hidden" id="customerCompanyId">
+            <div id="customerSuggest" class="cust-suggest" style="display:none;"></div>
           </div>
           <div class="form-group">
             <label>Invoice Number</label>
             <input type="text" id="invoiceNumber" class="form-control" placeholder="e.g. INV-2025-001">
           </div>
+        </div>
+        <div class="form-group">
+          <label>Purchase Order <span style="color:var(--text-muted);font-weight:400;">(optional — confirmed POs only)</span></label>
+          <select id="poSelect" class="form-control" disabled>
+            <option value="">Select a customer first</option>
+          </select>
         </div>
         <div class="form-group">
           <label>Notes (optional)</label>
@@ -149,6 +170,65 @@
     let skipped = []; // { reel_number, reason }
     let html5QrCode = null;
     let scannerActive = false;
+    let crmCompanies = [];   // {id, name}
+    (async () => {
+      try { crmCompanies = await api('/api/po/companies'); } catch (e) {}
+    })();
+
+    function onCustomerInput() {
+      const input = document.getElementById('customerName');
+      const box = document.getElementById('customerSuggest');
+      const q = input.value.trim().toLowerCase();
+      // Typing invalidates any previous selection until they pick again
+      document.getElementById('customerCompanyId').value = '';
+      resetPO();
+      if (!q) { box.style.display = 'none'; return; }
+      const matches = crmCompanies.filter(c => c.name.toLowerCase().includes(q)).slice(0, 8);
+      if (!matches.length) {
+        box.innerHTML = `<div class="no-match">No CRM company matches — add them in the CRM first</div>`;
+        box.style.display = 'block';
+        return;
+      }
+      box.innerHTML = matches.map(c =>
+        `<div onmousedown="pickCustomer(${c.id}, '${esc(c.name).replace(/'/g,"\\'")}')">${esc(c.name)}</div>`
+      ).join('');
+      box.style.display = 'block';
+    }
+
+    function pickCustomer(id, name) {
+      document.getElementById('customerName').value = name;
+      document.getElementById('customerCompanyId').value = id;
+      document.getElementById('customerSuggest').style.display = 'none';
+      loadPOsForCompany(id);
+    }
+
+    function resetPO() {
+      const sel = document.getElementById('poSelect');
+      sel.disabled = true;
+      sel.innerHTML = '<option value="">Select a customer first</option>';
+    }
+
+    async function loadPOsForCompany(companyId) {
+      const sel = document.getElementById('poSelect');
+      try {
+        const pos = await api(`/api/po/companies/${companyId}/open`);
+        if (!pos.length) {
+          sel.innerHTML = '<option value="">No confirmed POs for this customer</option>';
+          sel.disabled = true;
+          return;
+        }
+        sel.innerHTML = '<option value="">— No PO (optional) —</option>' +
+          pos.map(p => `<option value="${p.id}">${esc(p.po_number)}${p.expected_dispatch_date ? ' · exp ' + p.expected_dispatch_date : ''}</option>`).join('');
+        sel.disabled = false;
+      } catch (e) { resetPO(); }
+    }
+
+    // Hide suggestions when clicking away
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#customerName') && !e.target.closest('#customerSuggest')) {
+        document.getElementById('customerSuggest').style.display = 'none';
+      }
+    });
 
     // === SCAN SOUND ===
     const scanSound = new AudioContext();
@@ -362,8 +442,10 @@
       renderCart();
       document.getElementById('cartCard').style.display = 'none';
       document.getElementById('customerName').value = '';
+      document.getElementById('customerCompanyId').value = '';
       document.getElementById('invoiceNumber').value = '';
       document.getElementById('outwardNotes').value = '';
+      resetPO();
       document.getElementById('scanInput').focus();
     }
 
@@ -372,11 +454,16 @@
       if (cart.length === 0) return showToast('Cart is empty', 'error');
 
       const customer_name = document.getElementById('customerName').value.trim();
+      const company_id = document.getElementById('customerCompanyId').value;
+      const po_id = document.getElementById('poSelect').value || null;
       const invoice_number = document.getElementById('invoiceNumber').value.trim();
       const notes = document.getElementById('outwardNotes').value.trim();
 
-      if (!customer_name || !invoice_number) {
-        return showToast('Customer name and invoice number are required', 'error');
+      if (!company_id) {
+        return showToast('Select a customer from the suggestions (must be a CRM company)', 'error');
+      }
+      if (!invoice_number) {
+        return showToast('Invoice number is required', 'error');
       }
 
       const btn = document.getElementById('submitBtn');
@@ -406,7 +493,9 @@
               customer_name,
               invoice_number,
               outward_type: 'Full',
-              notes: notes || undefined
+              notes: notes || undefined,
+              company_id: parseInt(company_id),
+              po_id: po_id ? parseInt(po_id) : null
             }
           });
           if (result.pending) {

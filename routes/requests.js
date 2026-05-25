@@ -78,7 +78,9 @@ router.post('/:id/approve', requireApprover, async (req, res) => {
             payload.invoice_number,
             payload.outward_type || 'Full',
             payload.quantity_shipped || null,
-            payload.notes
+            payload.notes,
+            payload.company_id || null,
+            payload.po_id || null
           );
         } catch (err) {
           errors.push(`${reel_number}: ${err.message}`);
@@ -155,7 +157,9 @@ router.post('/:id/edit-approve', requireApprover, async (req, res) => {
             newPayload.invoice_number,
             newPayload.outward_type || 'Full',
             newPayload.quantity_shipped || null,
-            newPayload.notes
+            newPayload.notes,
+            newPayload.company_id || null,
+            newPayload.po_id || null
           );
         } catch (err) {
           errors.push(`${reel_number}: ${err.message}`);

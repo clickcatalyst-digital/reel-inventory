@@ -259,7 +259,7 @@ router.post('/undo', async (req, res) => {
 });
 
 router.post('/grouped', async (req, res) => {
-  const { item_code, reel_numbers, customer_name, invoice_number, outward_type, notes } = req.body;
+  const { item_code, reel_numbers, customer_name, invoice_number, outward_type, notes, company_id, po_id } = req.body;
 
   if (!item_code || !reel_numbers?.length || !customer_name || !invoice_number) {
     return res.status(400).json({ error: 'item_code, reel_numbers, customer_name, and invoice_number are required' });
@@ -283,7 +283,7 @@ router.post('/grouped', async (req, res) => {
     const errors = [];
     for (const reel_number of reel_numbers) {
       try {
-        await executeOutwardReel(reel_number, customer_name, invoice_number, outward_type || 'Full', null, notes);
+        await executeOutwardReel(reel_number, customer_name, invoice_number, outward_type || 'Full', null, notes, company_id, po_id);
       } catch (err) {
         errors.push(`${reel_number}: ${err.message}`);
       }
@@ -306,7 +306,9 @@ router.post('/grouped', async (req, res) => {
       customer_name,
       invoice_number,
       outward_type: outward_type || 'Full',
-      notes: notes || null
+      notes: notes || null,
+      company_id: company_id || null,
+      po_id: po_id || null
     });
     await execute(
       'INSERT INTO requests (type, status, created_by, created_at, payload) VALUES (?, ?, ?, ?, ?)',
