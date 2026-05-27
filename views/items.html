@@ -119,29 +119,6 @@
   <script>
     document.addEventListener('DOMContentLoaded', loadItems);
 
-    // async function loadItems() {
-    //   try {
-    //     let items = await api('/api/items');
-    //     items.sort((a, b) => a.item_code.localeCompare(b.item_code));
-    //     const tbody = document.getElementById('itemsTable');
-    //     if (!items.length) {
-    //       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No items yet. Add your first component above.</td></tr>';
-    //       return;
-    //     }
-    //     tbody.innerHTML = items.map(item => `
-    //       <tr>
-    //         <td><strong>${item.item_code}</strong></td>
-    //         <td>${item.description}</td>
-    //         <td>${formatQty(item.default_spq)}</td>
-    //         <td>${formatDate(item.created_at)}</td>
-    //         <td>
-    //           <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.item_code}')">Delete</button>
-    //         </td>
-    //       </tr>
-    //     `).join('');
-    //   } catch (e) {}
-    // }
-
     const itemsTablePT = new PaginatedTable({
       containerId: 'itemsTable-container',
       pageSize: 10,
@@ -184,15 +161,6 @@
         loadItems();
       } catch (e) {}
     }
-
-    // async function deleteItem(itemCode) {
-    //   if (!confirm(`Delete ${itemCode}? This cannot be undone.`)) return;
-    //   try {
-    //     await api(`/api/items/${itemCode}`, { method: 'DELETE' });
-    //     showToast(`${itemCode} deleted`);
-    //     loadItems();
-    //   } catch (e) {}
-    // }
 
     function editItem(code, desc, spq) {
       document.getElementById('editOrigCode').value = code;
