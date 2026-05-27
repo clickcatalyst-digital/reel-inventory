@@ -100,6 +100,20 @@
     </div> -->
   </div>
 
+  <!-- EDIT MODAL -->
+  <div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;">
+    <div class="card" style="width:min(420px,90vw);margin:0;">
+      <div class="card-title">Edit Item</div>
+      <input type="hidden" id="editOrigCode">
+      <div class="form-group"><label>Description</label><input type="text" id="editDesc" class="form-control"></div>
+      <div class="form-group"><label>Default SPQ</label><input type="number" id="editSpq" class="form-control" min="1"></div>
+      <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+        <button class="btn btn-primary" onclick="saveEdit()">Save</button>
+        <button class="btn" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/public/js/app.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', loadItems);
@@ -136,7 +150,7 @@
         { label: 'Description', render: i => i.description },
         { label: 'SPQ', render: i => formatQty(i.default_spq) },
         { label: 'Added', render: i => formatDate(i.created_at) },
-        { label: '', render: i => `<button class="btn btn-danger btn-sm" onclick="deleteItem('${i.item_code}')">Delete</button>` },
+        { label: '', render: i => `<button class="btn btn-sm" style="margin-right:.25rem" onclick="editItem('${i.item_code}','${i.description.replace(/'/g,"\\'")}',${i.default_spq})">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteItem('${i.item_code}')">Delete</button>` },
       ]
     });
 
@@ -178,6 +192,28 @@
     //     loadItems();
     //   } catch (e) {}
     // }
+
+    function editItem(code, desc, spq) {
+      document.getElementById('editOrigCode').value = code;
+      document.getElementById('editDesc').value = desc;
+      document.getElementById('editSpq').value = spq;
+      const m = document.getElementById('editModal');
+      m.style.display = 'flex';
+      m.onclick = e => { if (e.target === m) m.style.display = 'none'; };
+    }
+
+    async function saveEdit() {
+      const code = document.getElementById('editOrigCode').value;
+      const description = document.getElementById('editDesc').value.trim();
+      const default_spq = parseInt(document.getElementById('editSpq').value);
+      if (!description || !default_spq) return showToast('Description and SPQ are required', 'error');
+      try {
+        await api(`/api/items/${encodeURIComponent(code)}`, { method: 'PUT', body: { description, default_spq } });
+        document.getElementById('editModal').style.display = 'none';
+        showToast(`${code} updated`);
+        loadItems();
+      } catch (e) {}
+    }
 
     async function deleteItem(itemCode) {
       if (!confirm(`Delete ${itemCode}? This cannot be undone.`)) return;
