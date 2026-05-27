@@ -45,9 +45,19 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:itemCode', async (req, res) => {
-  const { description, default_spq } = req.body;
-  const result = await execute('UPDATE items SET description = ?, default_spq = ? WHERE item_code = ?',
-    [description.trim(), parseInt(default_spq), req.params.itemCode]);
+  const { item_code, description, default_spq } = req.body;
+  const newCode = item_code ? item_code.trim().toUpperCase() : req.params.itemCode;
+
+  // If renaming, check the new code isn't already taken by another item
+  if (newCode !== req.params.itemCode) {
+    const conflict = await queryOne('SELECT * FROM items WHERE item_code = ?', [newCode]);
+    if (conflict) return res.status(409).json({ error: `Item code "${newCode}" already exists` });
+  }
+
+  const result = await execute(
+    'UPDATE items SET item_code = ?, description = ?, default_spq = ? WHERE item_code = ?',
+    [newCode, description.trim(), parseInt(default_spq), req.params.itemCode]
+  );
   if (result.changes === 0) return res.status(404).json({ error: 'Item not found' });
   res.json({ success: true, message: 'Item updated' });
 });
