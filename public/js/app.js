@@ -28,7 +28,7 @@ function showToast(message, type = 'success') {
   toast.textContent = message;
   toast.style.background = type === 'error' ? '#dc2626' : '#1a1a18';
   toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 3000);
+  setTimeout(() => toast.classList.remove('show'), 5000);
 }
 
 // ========== DATE FORMATTING ==========
@@ -83,6 +83,20 @@ async function injectNavExtras() {
   try {
     const user = await fetch('/api/auth/me').then(r => r.json()).catch(() => null);
     if (!user) return;
+
+    // --- WELCOME TOAST (Only runs once per session) ---
+    if (!sessionStorage.getItem('hasWelcomed')) {
+      const name = user.username.charAt(0).toUpperCase() + user.username.slice(1);
+      const hour = new Date().getHours();
+      let greeting = 'Good evening';
+      
+      if (hour < 12) greeting = 'Good morning';
+      else if (hour < 17) greeting = 'Good afternoon';
+
+      showToast(`${greeting}, ${name}!`);
+      sessionStorage.setItem('hasWelcomed', 'true');
+    }
+    // --------------------------------------------------
 
     const isApprover = ['admin', 'manager'].includes(user.role);
     const navLinks = document.querySelector('.nav-links');
